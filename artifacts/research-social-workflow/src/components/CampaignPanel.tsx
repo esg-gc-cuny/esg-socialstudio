@@ -39,27 +39,27 @@ function CampaignCard({
   saving: boolean;
 }) {
   const [drafts, setDrafts] = useState<PlatformDraft[]>(campaign.outputs);
-  const [activePlatform, setActivePlatform] = useState(campaign.outputs[0]?.platform ?? "");
-  const [copied, setCopied] = useState(false);
-  const activeDraft = drafts.find((draft) => draft.platform === activePlatform);
+  const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
+  const [copyErrorPlatform, setCopyErrorPlatform] = useState<string | null>(null);
   const makeStatusUpdate = (status: Campaign["status"]) => {
     onReview(campaign, { status, outputs: drafts });
   };
-  const copyDraft = async () => {
-    if (!activeDraft) {
-      return;
-    }
-    const text = [activeDraft.content, activeDraft.hashtags.join(" ")].filter(Boolean).join("\n\n");
+  const copyDraft = async (draft: PlatformDraft) => {
+    const text = [draft.content, draft.hashtags.join(" ")].filter(Boolean).join("\n\n");
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1600);
+      setCopiedPlatform(draft.platform);
+      setCopyErrorPlatform(null);
+      window.setTimeout(() => {
+        setCopiedPlatform((current) => current === draft.platform ? null : current);
+      }, 1600);
     } catch {
-      setCopied(false);
+      setCopyErrorPlatform(draft.platform);
+      window.setTimeout(() => setCopyErrorPlatform((current) => current === draft.platform ? null : current), 2500);
     }
   };
-  const updateDraft = (content: string) => {
-    setDrafts((current) => current.map((draft) => draft.platform === activePlatform
+  const updateDraft = (platform: string, content: string) => {
+    setDrafts((current) => current.map((draft) => draft.platform === platform
       ? {
           ...draft,
           content,
@@ -98,47 +98,53 @@ function CampaignCard({
           ~${Number(campaign.estimatedCostUsd).toFixed(4)} direct API ref.
         </span>
       </div>
-      <div className="platform-tabs" role="tablist" aria-label="Platform drafts">
-        {campaign.outputs.map((draft) => (
-          <button
-            key={draft.platform}
-            role="tab"
-            aria-selected={activePlatform === draft.platform}
-            className={`platform-tab${activePlatform === draft.platform ? " active" : ""}`}
-            onClick={() => setActivePlatform(draft.platform)}
-            data-testid={`tab-platform-${campaign.id}-${draft.platform}`}
-          >
-            {platformNames[draft.platform] ?? draft.platform}
-          </button>
-        ))}
-      </div>
-      {activeDraft && (
-        <div className="draft-editor">
+      <div className="draft-stack" aria-label="Platform drafts">
+        {drafts.map((draft) => (
+          <div className="draft-editor" key={draft.platform}>
           <div className="draft-topline">
-            <span className="field-label">{platformNames[activeDraft.platform] ?? activeDraft.platform} draft</span>
-            <span
-              className={`draft-char${activeDraft.characterCount > activeDraft.characterLimit ? " over-limit" : ""}`}
-              data-testid={`draft-count-${campaign.id}-${activeDraft.platform}`}
-            >
-              {activeDraft.characterCount} / {activeDraft.characterLimit}
-            </span>
+              <div className="draft-heading">
+                <span className="field-label">{platformNames[draft.platform] ?? draft.platform} draft</span>
+                <span
+                  className={`draft-char${draft.characterCount > draft.characterLimit ? " over-limit" : ""}`}
+                  data-testid={`draft-count-${campaign.id}-${draft.platform}`}
+                >
+                  {draft.characterCount} / {draft.characterLimit}
+                </span>
+              </div>
+              <button
+                className="button button-small draft-copy-button"
+                onClick={() => void copyDraft(draft)}
+                data-testid={`button-copy-draft-${campaign.id}-${draft.platform}`}
+                aria-live="polite"
+              >
+                {copiedPlatform === draft.platform ? <Check size={12} /> : <Clipboard size={12} />}
+                {copiedPlatform === draft.platform
+                  ? "Copied"
+                  : copyErrorPlatform === draft.platform
+                    ? "Copy failed"
+                    : `Copy ${platformNames[draft.platform] ?? draft.platform}`}
+              </button>
           </div>
           <textarea
             className="textarea draft-copy"
-            value={activeDraft.content}
-            onChange={(event) => updateDraft(event.target.value)}
-            aria-label={`${platformNames[activeDraft.platform] ?? activeDraft.platform} draft copy`}
-            data-testid={`textarea-draft-${campaign.id}-${activeDraft.platform}`}
+            value={draft.content}
+            onChange={(event) => updateDraft(draft.platform, event.target.value)}
+            aria-label={`${platformNames[draft.platform] ?? draft.platform} draft copy`}
+            data-testid={`textarea-draft-${campaign.id}-${draft.platform}`}
           />
-          {activeDraft.hashtags.length > 0 && (
-            <div className="hashtag-row" data-testid={`hashtags-${campaign.id}-${activeDraft.platform}`}>
-              {activeDraft.hashtags.map((tag) => (
+          {draft.hashtags.length > 0 && (
+            <div className="hashtag-row" data-testid={`hashtags-${campaign.id}-${draft.platform}`}>
+              {draft.hashtags.map((tag) => (
                 <span className="hashtag" key={tag}>{tag.startsWith("#") ? tag : `#${tag}`}</span>
               ))}
             </div>
           )}
-        </div>
-      )}
+          {copyErrorPlatform === draft.platform && (
+            <div className="copy-error" role="status">Could not copy. Try selecting and copying the text.</div>
+          )}
+          </div>
+        ))}
+      </div>
       <div className="campaign-actions">
         <div className="campaign-actions-left">
           <button
@@ -149,15 +155,6 @@ function CampaignCard({
           >
             <Check size={12} />
             Save edits
-          </button>
-          <button
-            className="button button-small"
-            onClick={copyDraft}
-            disabled={!activeDraft}
-            data-testid={`button-copy-draft-${campaign.id}`}
-          >
-            {copied ? <Check size={12} /> : <Clipboard size={12} />}
-            {copied ? "Copied" : "Copy draft"}
           </button>
           <button
             className="button button-small button-quiet button-danger"
@@ -210,7 +207,7 @@ export function CampaignPanel({
       <div className="panel-header">
         <div>
           <h2 className="panel-title">Campaign drafts</h2>
-          <div className="panel-subtitle">Review each platform before anything leaves the desk.</div>
+          <div className="panel-subtitle">Copy any platform draft directly, then review the full set.</div>
         </div>
         <span className="eyebrow">{campaigns.length} total</span>
       </div>

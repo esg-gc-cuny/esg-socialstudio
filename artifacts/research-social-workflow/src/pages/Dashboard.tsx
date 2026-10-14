@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
@@ -93,7 +93,7 @@ function Dashboard() {
 
   const [selectedSource, setSelectedSource] = useState("");
   const [provider, setProvider] = useState("openai");
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["linkedin", "bluesky", "x"]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["linkedin", "facebook", "bluesky", "substack"]);
   const [tone, setTone] = useState("Clear, curious, and grounded in evidence");
   const [audience, setAudience] = useState("");
   const [campaignGoal, setCampaignGoal] = useState("");
@@ -107,6 +107,17 @@ function Dashboard() {
   const summary = dashboardQuery.data;
   const pendingReviews = summary?.needsReviewCount ?? campaigns.filter((item) => item.status === "needs_review").length;
   const approvedCount = summary?.approvedCount ?? campaigns.filter((item) => item.status === "approved").length;
+
+  useEffect(() => {
+    if (sources.length === 0) {
+      if (selectedSource) setSelectedSource("");
+      return;
+    }
+    if (!sources.some((source) => String(source.id) === selectedSource)) {
+      setSelectedSource(String(sources[0].id));
+    }
+  }, [sources, selectedSource]);
+
   const notify = (message: string) => {
     setNotice(message);
     window.setTimeout(() => setNotice(""), 2800);
@@ -137,9 +148,10 @@ function Dashboard() {
     createSource.mutate(
       { data: payload as SourceInput },
       {
-        onSuccess: () => {
+        onSuccess: (source) => {
           void queryClient.invalidateQueries({ queryKey: getListSourcesQueryKey() });
           void queryClient.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+          setSelectedSource(String(source.id));
           notify("Source saved to the library.");
         },
         onError: () => notify("Source could not be saved. Try again."),
@@ -179,7 +191,7 @@ function Dashboard() {
       sourceId: Number(selectedSource),
       provider: provider as CampaignGenerationInput["provider"],
       platforms: selectedPlatforms as CampaignGenerationInput["platforms"],
-      tone: tone.trim(),
+      tone: tone.trim() || "Clear, curious, and grounded in evidence",
       audience: audience.trim() || undefined,
       campaignGoal: campaignGoal.trim() || undefined,
     };
@@ -189,6 +201,7 @@ function Dashboard() {
         onSuccess: () => {
           refreshAll();
           notify("Platform drafts generated. Ready for review.");
+          window.setTimeout(() => scrollTo("campaigns"), 80);
         },
         onError: () => notify("Draft generation failed. Check provider access and try again."),
       },
@@ -330,13 +343,13 @@ function Dashboard() {
             <div className="panel-header">
               <div>
                 <h2 className="panel-title">Build a draft set</h2>
-                <div className="panel-subtitle">One source, tailored to the channels you select.</div>
+                  <div className="panel-subtitle">Choose a source and channels. Your first saved source is preselected.</div>
               </div>
               <span className="eyebrow">01 / Compose</span>
             </div>
             <form className="panel-body source-form" onSubmit={handleGenerate}>
               <div className="field">
-                <label htmlFor="campaign-source">Research source</label>
+                    <label htmlFor="campaign-source">1. Choose a source</label>
                 <select
                   id="campaign-source"
                   className="select"
@@ -356,7 +369,17 @@ function Dashboard() {
                 )}
               </div>
               <div className="field">
-                <label>Destination platforms</label>
+                <div className="platform-picker-heading">
+                  <label>2. Choose channels</label>
+                  <div className="platform-pick-actions">
+                    <button type="button" className="text-button" onClick={() => setSelectedPlatforms(platforms.map((item) => item.id))} data-testid="button-select-all-platforms">
+                      Select all
+                    </button>
+                    <button type="button" className="text-button" onClick={() => setSelectedPlatforms([])} data-testid="button-clear-platforms">
+                      Clear
+                    </button>
+                  </div>
+                </div>
                 <div className="platform-picker">
                   {platforms.map((platform) => (
                     <label className="platform-option" key={platform.id}>
@@ -371,71 +394,74 @@ function Dashboard() {
                   ))}
                 </div>
               </div>
-              <div className="field-row">
-                <div className="field">
-                  <label htmlFor="provider-select">Writing model</label>
-                  <select
-                    id="provider-select"
-                    className="select"
-                    value={provider}
-                    onChange={(event) => setProvider(event.target.value)}
-                    data-testid="select-provider"
-                  >
-                    {(supportedProviders.length ? supportedProviders : [
-                      { id: "openai", name: "OpenAI" },
-                      { id: "anthropic", name: "Claude" },
-                      { id: "gemini", name: "Gemini" },
-                    ]).map((item) => (
-                      <option key={item.id} value={item.id}>{providerLabels[item.id] ?? item.name}</option>
-                    ))}
-                  </select>
+              <details className="settings-disclosure">
+                <summary>Optional writing settings</summary>
+                <div className="settings-content">
+                  <div className="field-row">
+                    <div className="field">
+                      <label htmlFor="provider-select">Writing model</label>
+                      <select
+                        id="provider-select"
+                        className="select"
+                        value={provider}
+                        onChange={(event) => setProvider(event.target.value)}
+                        data-testid="select-provider"
+                      >
+                        {(supportedProviders.length ? supportedProviders : [
+                          { id: "openai", name: "OpenAI" },
+                          { id: "anthropic", name: "Claude" },
+                          { id: "gemini", name: "Gemini" },
+                        ]).map((item) => (
+                          <option key={item.id} value={item.id}>{providerLabels[item.id] ?? item.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="field">
+                      <label htmlFor="tone-input">Editorial tone</label>
+                      <input
+                        id="tone-input"
+                        className="input"
+                        value={tone}
+                        onChange={(event) => setTone(event.target.value)}
+                        maxLength={120}
+                        data-testid="input-campaign-tone"
+                      />
+                    </div>
+                  </div>
+                  <div className="field-row">
+                    <div className="field">
+                      <label htmlFor="audience-input">Audience <span>(optional)</span></label>
+                      <input
+                        id="audience-input"
+                        className="input"
+                        value={audience}
+                        onChange={(event) => setAudience(event.target.value)}
+                        maxLength={200}
+                        placeholder="e.g. Policy researchers"
+                        data-testid="input-campaign-audience"
+                      />
+                    </div>
+                    <div className="field">
+                      <label htmlFor="goal-input">Campaign goal <span>(optional)</span></label>
+                      <input
+                        id="goal-input"
+                        className="input"
+                        value={campaignGoal}
+                        onChange={(event) => setCampaignGoal(event.target.value)}
+                        maxLength={200}
+                        placeholder="e.g. Invite seminar sign-ups"
+                        data-testid="input-campaign-goal"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div className="field">
-                  <label htmlFor="tone-input">Editorial tone</label>
-                  <input
-                    id="tone-input"
-                    className="input"
-                    value={tone}
-                    onChange={(event) => setTone(event.target.value)}
-                    maxLength={120}
-                    required
-                    data-testid="input-campaign-tone"
-                  />
-                </div>
-              </div>
-              <div className="field-row">
-                <div className="field">
-                  <label htmlFor="audience-input">Audience <span>(optional)</span></label>
-                  <input
-                    id="audience-input"
-                    className="input"
-                    value={audience}
-                    onChange={(event) => setAudience(event.target.value)}
-                    maxLength={200}
-                    placeholder="e.g. Policy researchers"
-                    data-testid="input-campaign-audience"
-                  />
-                </div>
-                <div className="field">
-                  <label htmlFor="goal-input">Campaign goal <span>(optional)</span></label>
-                  <input
-                    id="goal-input"
-                    className="input"
-                    value={campaignGoal}
-                    onChange={(event) => setCampaignGoal(event.target.value)}
-                    maxLength={200}
-                    placeholder="e.g. Invite seminar sign-ups"
-                    data-testid="input-campaign-goal"
-                  />
-                </div>
-              </div>
-              <hr className="section-break" />
+              </details>
               <div className="workflow-note">
                 <Sparkles size={13} style={{ flexShrink: 0, marginTop: 1 }} />
                 This creates editable drafts only. Nothing is scheduled, published, or posted.
               </div>
               <div className="form-actions">
-                <span className="form-hint">{selectedPlatforms.length} {selectedPlatforms.length === 1 ? "platform" : "platforms"} selected</span>
+                <span className="form-hint">{selectedPlatforms.length} {selectedPlatforms.length === 1 ? "channel" : "channels"} selected</span>
                 <button
                   type="submit"
                   className="button button-primary"
@@ -443,7 +469,7 @@ function Dashboard() {
                   data-testid="button-generate-campaign"
                 >
                   {generateCampaign.isPending ? <LoaderCircle size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                  {generateCampaign.isPending ? "Generating drafts…" : "Generate drafts"}
+                  {generateCampaign.isPending ? "Generating drafts…" : `Create ${selectedPlatforms.length} drafts`}
                 </button>
               </div>
             </form>
