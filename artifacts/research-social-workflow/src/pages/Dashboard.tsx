@@ -129,7 +129,7 @@ function Dashboard() {
           sourceId,
           provider: "anthropic",
           platforms: selected as CampaignGenerationInput["platforms"],
-          tone: "Warm, clear, and grounded in the evidence",
+          tone: "Match the article's voice; write a concise teaser that invites readers to continue",
         },
       },
       {

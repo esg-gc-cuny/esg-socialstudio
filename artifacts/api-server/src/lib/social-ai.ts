@@ -2,15 +2,20 @@ import Anthropic from "@anthropic-ai/sdk";
 import { ai } from "@workspace/integrations-gemini-ai";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import type { PlatformDraft } from "@workspace/db";
+import {
+  buildAnalysisPrompt,
+  buildAnalysisRetryPrompt,
+  buildPlatformPrompt,
+  buildPlatformRetryPrompt,
+  platformRules,
+  type ArticleAnalysis,
+  type HookAngle,
+  type PromptPlatformId,
+  type PlatformPromptInput,
+} from "../config/social-prompts";
 
 export type ProviderId = "openai" | "anthropic" | "gemini";
-export type PlatformId =
-  | "linkedin"
-  | "facebook"
-  | "bluesky"
-  | "substack"
-  | "x"
-  | "instagram";
+export type PlatformId = PromptPlatformId;
 
 type GenerationContext = {
   title: string;
@@ -30,6 +35,34 @@ type GenerationResult = {
   outputTokens: number;
 };
 
+type TokenUsage = {
+  inputTokens: number;
+  outputTokens: number;
+};
+
+type SingleVariant = {
+  format: "single";
+  angle: HookAngle;
+  content: string;
+  hashtags: unknown;
+};
+
+type ThreadVariant = {
+  format: "thread";
+  angle: HookAngle;
+  posts: string[];
+  hashtags: unknown;
+};
+
+type PlatformResponse = {
+  variants: Array<SingleVariant | ThreadVariant>;
+  recommendedIndex: number;
+};
+
+type ModelTextResponse = TokenUsage & {
+  text: string;
+};
+
 const modelByProvider: Record<ProviderId, string> = {
   openai: "gpt-6-luna",
   anthropic: "claude-haiku-5-5",
@@ -37,12 +70,12 @@ const modelByProvider: Record<ProviderId, string> = {
 };
 
 const characterLimits: Record<PlatformId, number> = {
-  linkedin: 3000,
-  facebook: 63206,
-  bluesky: 300,
-  substack: 50000,
-  x: 280,
-  instagram: 2200,
+  linkedin: platformRules.linkedin.maxCharacters,
+  facebook: platformRules.facebook.maxCharacters,
+  bluesky: platformRules.bluesky.maxCharacters,
+  substack: platformRules.substack.maxCharacters,
+  x: platformRules.x.maxCharacters,
+  instagram: platformRules.instagram.maxCharacters,
 };
 
 const platformNames: Record<PlatformId, string> = {
@@ -54,15 +87,123 @@ const platformNames: Record<PlatformId, string> = {
   instagram: "Instagram",
 };
 
+const allowedHookAngles = new Set<HookAngle>([
+  "curiosity gap",
+  "bold claim",
+  "specific stat",
+  "personal story",
+  "question",
+  "contrarian",
+]);
+
 const forbiddenPerspectivePattern =
   /\b(?:i|me|my|mine|myself|we|us|our|ours|ourselves|you|your|yours|yourself|yourselves)\b|\b(?:i|we|you)[’'](?:m|ve|ll|d|re)\b/i;
 
-function containsNonThirdPersonText(text: string): boolean {
-  const teaserText = text.replace(
-    /(?:^|\n)[ \t]*Read the full article on our website:[ \t]*https?:\/\/\S+[ \t]*(?=\n|$)/gim,
-    "",
-  );
-  return forbiddenPerspectivePattern.test(teaserText.replace(/https?:\/\/\S+/gi, ""));
+function getAnthropicClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("Anthropic API key is missing. Add ANTHROPIC_API_KEY in Replit Secrets.");
+  }
+  return new Anthropic({ apiKey });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function requireText(value: unknown, label: string): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${label} must be a non-empty string.`);
+  }
+  return value.trim();
+}
+
+function extractJson(text: string): unknown {
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/, "");
+  return JSON.parse(cleaned) as unknown;
+}
+
+function parseArticleAnalysis(text: string): ArticleAnalysis {
+  const parsed = extractJson(text);
+  if (!isRecord(parsed)) {
+    throw new Error("Analysis must be a JSON object.");
+  }
+
+  const core_thesis = requireText(parsed.core_thesis, "core_thesis");
+  const reader_payoff = requireText(parsed.reader_payoff, "reader_payoff");
+  const tension = requireText(parsed.tension, "tension");
+  const audience = requireText(parsed.audience, "audience");
+
+  if (!Array.isArray(parsed.best_details) || parsed.best_details.length < 3 || parsed.best_details.length > 5) {
+    throw new Error("best_details must contain 3–5 supported details.");
+  }
+  const best_details = parsed.best_details.map((detail, index) => {
+    if (!isRecord(detail)) {
+      throw new Error(`best_details[${index}] must be an object.`);
+    }
+    return {
+      detail: requireText(detail.detail, `best_details[${index}].detail`),
+      evidence: requireText(detail.evidence, `best_details[${index}].evidence`),
+    };
+  });
+
+  if (!isRecord(parsed.voice_profile)) {
+    throw new Error("voice_profile must be an object.");
+  }
+  const voice = parsed.voice_profile;
+  if (
+    typeof voice.formality !== "number" ||
+    !Number.isInteger(voice.formality) ||
+    voice.formality < 1 ||
+    voice.formality > 10
+  ) {
+    throw new Error("voice_profile.formality must be an integer from 1 to 10.");
+  }
+  if (!Array.isArray(voice.signature_phrases) || voice.signature_phrases.some((phrase) => typeof phrase !== "string")) {
+    throw new Error("voice_profile.signature_phrases must be an array of strings.");
+  }
+  const voice_profile = {
+    formality: voice.formality,
+    humor: requireText(voice.humor, "voice_profile.humor"),
+    sentence_length: requireText(voice.sentence_length, "voice_profile.sentence_length"),
+    first_person_use: requireText(voice.first_person_use, "voice_profile.first_person_use"),
+    jargon_level: requireText(voice.jargon_level, "voice_profile.jargon_level"),
+    emotional_register: requireText(voice.emotional_register, "voice_profile.emotional_register"),
+    signature_phrases: voice.signature_phrases.map((phrase) => phrase.trim()).filter(Boolean),
+  };
+
+  if (!Array.isArray(parsed.hook_angles) || parsed.hook_angles.length !== 4) {
+    throw new Error("hook_angles must contain exactly four distinct angles.");
+  }
+  const hook_angles = parsed.hook_angles.map((angle, index) => {
+    if (!isRecord(angle) || typeof angle.angle !== "string") {
+      throw new Error(`hook_angles[${index}] must include an angle label.`);
+    }
+    const label = angle.angle.trim().toLowerCase() as HookAngle;
+    if (!allowedHookAngles.has(label)) {
+      throw new Error(`hook_angles[${index}] uses an unsupported angle label.`);
+    }
+    return {
+      angle: label,
+      hook: requireText(angle.hook, `hook_angles[${index}].hook`),
+    };
+  });
+  if (new Set(hook_angles.map((angle) => angle.angle)).size !== 4) {
+    throw new Error("hook_angles must use four different angle labels.");
+  }
+
+  return {
+    core_thesis,
+    reader_payoff,
+    tension,
+    best_details,
+    voice_profile,
+    audience,
+    hook_angles,
+  };
 }
 
 function removePublisherName(content: string): string {
@@ -85,479 +226,525 @@ function removePublisherName(content: string): string {
     .trim();
 }
 
-function getAnthropicClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("Anthropic API key is missing. Add ANTHROPIC_API_KEY in Replit Secrets.");
-  }
-  return new Anthropic({ apiKey });
-}
-
-function hasNonThirdPersonDraft(drafts: PlatformDraft[]): boolean {
-  return drafts.some((draft) => containsNonThirdPersonText(draft.content));
-}
-
-function removeNonThirdPersonSentences(content: string): string {
-  return content
-    .split(/(?<=[.!?])\s+|[\r\n]+/u)
-    .filter((sentence) => !containsNonThirdPersonText(sentence))
-    .join("\n")
+function normalizeContent(rawContent: string): string {
+  return removePublisherName(rawContent)
+    .replace(
+      /(?:^|\n)[ \t]*(?:Read the full article on our website:|Full article:|The full article is available at)[ \t]*https?:\/\/\S+[ \t]*(?=\n|$)/gim,
+      "",
+    )
+    .replace(/https?:\/\/\S+/gi, "")
+    .replace(/#[\p{L}\p{N}_-]+/gu, "")
+    .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u200D\u20E3]/gu, "")
+    .replace(/\s*--+\s*/g, ", ")
+    .replace(/\s*[\u2012-\u2015]\s*/g, ", ")
+    .replace(/,\s*,+/g, ",")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
-function enforceThirdPerson(
-  drafts: PlatformDraft[],
-  context: GenerationContext,
-): PlatformDraft[] {
-  const safeInvitation = "What questions do these findings raise?";
-
-  return drafts.map((draft) => {
-    let content = removeNonThirdPersonSentences(
-      removePublisherName(draft.content),
-    );
-    if (!content) {
-      content = "The Economic Studies Group shares new research.";
-    }
-    if (!/\b(?:read|discussion|discuss|conversation|comments?|respond|response)\b/i.test(content)) {
-      content += `\n\n${safeInvitation}`;
-    }
-    if (context.sourceUrl && !content.includes(context.sourceUrl)) {
-      content += `\n\nFull article: ${context.sourceUrl}`;
-    }
-
-    const hashtagLength = draft.hashtags.length
-      ? draft.hashtags.join(" ").length + 1
-      : 0;
-    const contentLimit = Math.max(0, draft.characterLimit - hashtagLength);
-    if (content.length > contentLimit) {
-      const linkLine = context.sourceUrl
-        ? `Full article: ${context.sourceUrl}`
-        : "";
-      const invitation = "What questions remain?";
-      const suffix = [invitation, linkLine].filter(Boolean).join("\n\n");
-      const safeBody = context.sourceUrl
-        ? content.replace(context.sourceUrl, "").trim()
-        : content;
-      const bodyLimit = Math.max(0, contentLimit - suffix.length - 2);
-      const body = safeBody
-        .slice(0, bodyLimit)
-        .replace(/\s+\S*$/, "")
-        .trim();
-      content = [body, suffix].filter(Boolean).join("\n\n");
-    }
-
-    return {
-      ...draft,
-      content,
-      characterCount:
-        content.length +
-        (draft.hashtags.length ? draft.hashtags.join(" ").length + 1 : 0),
-    };
-  });
-}
-
-const shortPostTargets: Record<PlatformId, number> = {
-  linkedin: 650,
-  facebook: 350,
-  bluesky: 280,
-  substack: 500,
-  x: 280,
-  instagram: 350,
-};
-
-function shortenAtClauseBoundary(text: string, maxLength: number): string {
-  const clauseBreak = /\s+(?:but|yet|while|although|though)\s+/i.exec(text);
-  if (!clauseBreak || clauseBreak.index > maxLength) return "";
-  const clause = text.slice(0, clauseBreak.index).replace(/[,:;]\s*$/, "").trim();
-  if (!clause || clause.length + 1 > maxLength) return "";
-  return `${clause}.`;
-}
-
-function isNaturalTopicQuestion(sentence: string): boolean {
-  if (
-    /^(?:what questions do (?:these|the) findings raise|what remains unresolved|which question deserves more attention|what does this suggest)\??$/i.test(
-      sentence.trim(),
-    )
-  ) {
-    return false;
-  }
-  return (
-    sentence.includes("?") &&
-    /^(?:what|how|why|which|when|where|who|can|could|should|does|do|is|are|will|would)\b/i.test(
-      sentence.trim(),
-    )
-  );
-}
-
-function makeTitleFallback(title: string, maxLength: number): string {
-  let topic = title.split(/[:.!?]/u)[0].trim();
-  if (!topic) return "The article explores a timely economic question.";
-  const startsWithArticle = /^(?:the|a|an)\s/i.test(topic);
-  topic = topic.replace(/^(?:the|a|an)\s+/i, "").toLowerCase();
-  if (!startsWithArticle && /^(?:economics|effects?|impacts?|role|future|rise|growth|costs?|benefits?|risks?|relationship|case|markets?|policy|trade|labor|employment)\b/i.test(topic)) {
-    topic = `the ${topic}`;
-  }
-  const fallback = `The article examines ${topic}.`;
-  if (fallback.length <= maxLength) return fallback;
-  return maxLength >= 32 ? "The article examines this topic." : "";
-}
-
-function makeBriefTeasers(
-  drafts: PlatformDraft[],
-  context: GenerationContext,
-): PlatformDraft[] {
-  return drafts.map((draft) => {
-    const platform = draft.platform as PlatformId;
-    const maxHookSentences =
-      platform === "linkedin" || platform === "substack" ? 2 : 1;
-    const safeSentences = removeNonThirdPersonSentences(
-      removePublisherName(draft.content),
-    )
-      .split(/(?<=[.!?])\s+|[\r\n]+/u)
-      .filter(Boolean)
-      .filter((sentence) => !/\b(?:Economic Studies Group|the Group)\b/i.test(sentence))
-      .filter((sentence) => !/\b(?:read|discussion|discuss|conversation|comments?|respond|response)\b/i.test(sentence))
-      .filter((sentence) => !context.sourceUrl || !sentence.includes(context.sourceUrl))
-      .filter(Boolean);
-    const questionLimit: Record<PlatformId, number> = {
-      linkedin: 75,
-      facebook: 40,
-      bluesky: 28,
-      substack: 70,
-      x: 28,
-      instagram: 40,
-    };
-    const topicQuestion = safeSentences.find(
-      (sentence) =>
-        isNaturalTopicQuestion(sentence) &&
-        sentence.length <= questionLimit[platform],
-    );
-    const hookCandidates = safeSentences
-      .filter((sentence) => !sentence.includes("?"))
-      .filter((sentence) => !/^(?:it|they|their|these|those|this|its)\b/i.test(sentence))
-      .slice(0, maxHookSentences);
-    const compactHooks = hookCandidates.map((sentence) =>
-      sentence.replace(/,\s*[^,]{18,},/g, "").replace(/\s{2,}/g, " ").trim(),
-    );
-    const hashtagsLength = draft.hashtags.length
-      ? draft.hashtags.join(" ").length + 2
-      : 0;
-    const contentLimit = Math.max(
-      0,
-      shortPostTargets[platform] - hashtagsLength,
-    );
-    const linkLine = context.sourceUrl
-      ? `Read the full article on our website: ${context.sourceUrl}`
-      : "";
-    const invitation = topicQuestion || "";
-    const fixedLength =
-      (invitation ? invitation.length + 1 : 0) +
-      (linkLine ? linkLine.length + 2 : 0);
-    const bodyBudget = Math.max(0, contentLimit - fixedLength);
-    const selectedHooks: string[] = [];
-    for (const sentence of compactHooks) {
-      const next = [...selectedHooks, sentence].join(" ");
-      if (next.length <= bodyBudget) {
-        selectedHooks.push(sentence);
-        continue;
-      }
-      if (selectedHooks.length === 0) {
-        const shortened = shortenAtClauseBoundary(sentence, bodyBudget);
-        if (shortened) selectedHooks.push(shortened);
-        else continue;
-      }
-      break;
-    }
-    let body = selectedHooks.join(" ");
-    let finalInvitation = invitation;
-    if (!body) {
-      body = makeTitleFallback(context.title, bodyBudget);
-      if (body && body.length + (finalInvitation ? finalInvitation.length + 1 : 0) > bodyBudget) {
-        finalInvitation = "";
-      }
-    }
-    const teaserParagraph = [body, finalInvitation].filter(Boolean).join(" ");
-    const content = [teaserParagraph, linkLine].filter(Boolean).join("\n\n");
-
-    return {
-      ...draft,
-      content,
-      characterLimit: shortPostTargets[platform],
-      characterCount:
-        content.length +
-        (draft.hashtags.length
-          ? draft.hashtags.join(" ").length + 2
-          : 0),
-    };
-  });
-}
-
-function buildPrompt(context: GenerationContext): string {
-  const platformInstructions = context.platforms
-    .map((platform) => {
-      const name = platformNames[platform];
-      const limit = shortPostTargets[platform];
-      const hashtagReserve: Record<PlatformId, number> = {
-        linkedin: 45,
-        facebook: 38,
-        bluesky: 24,
-        substack: 36,
-        x: 24,
-        instagram: 38,
-      };
-      const ctaLength = context.sourceUrl
-        ? `Read the full article on our website: ${context.sourceUrl}`.length + 4
-        : 0;
-      const paragraphCaps: Record<PlatformId, number> = {
-        linkedin: 260,
-        facebook: 100,
-        bluesky: 65,
-        substack: 220,
-        x: 65,
-        instagram: 100,
-      };
-      const bodyCharacterBudget = Math.max(
-        0,
-        Math.min(
-          paragraphCaps[platform],
-          limit - ctaLength - hashtagReserve[platform],
-        ),
-      );
-      const style =
-        platform === "substack"
-          ? `Write a Substack Note, not a newsletter post. Use a thoughtful, editorial teaser paragraph of 2 short sentences, about 25-35 words and no more than ${bodyCharacterBudget} characters before hashtags and the final link. Name the topic, add one concrete context point, and use a specific question only if it sounds natural.`
-          : platform === "bluesky" || platform === "x"
-            ? `Write one concise, conversational teaser paragraph of 10-16 words and no more than ${bodyCharacterBudget} characters before hashtags and the final link. Name the topic and include one concrete context point. A short, specific question is optional; never return a question alone.`
-            : platform === "linkedin"
-              ? `Write a credible, professional, insight-led teaser paragraph of 2 sentences, about 30-40 words and no more than ${bodyCharacterBudget} characters before hashtags and the final link. Name the economic topic, add one specific fact or tension, and show why it matters. A policy question is optional if it sounds natural.`
-              : platform === "facebook"
-                ? `Write an approachable, plain-language Page teaser paragraph of 1-2 short sentences, about 18-25 words and no more than ${bodyCharacterBudget} characters before hashtags and the final link. Name the topic and give one clear practical or economic implication. A short, specific question is optional.`
-              : platform === "instagram"
-                ? "Use a short, accessible caption with a strong first line and a clear next step."
-                : "Write a warm, accessible post with a plain-language takeaway, the article link, and a relevant invitation to discuss.";
-      return `- ${name} (${platform}, maximum ${limit} characters): ${style}`;
-    })
-    .join("\n");
-
-  return `You manage social posts for a research publisher. Adapt published research articles and primers into accurate public-facing posts that encourage followers to read and discuss the original work.
-
-Editorial rules:
-- Use only claims supported by the source. Never invent study results, statistics, quotes, authors, or implications.
-- Preserve uncertainty, limitations, and non-causal language when needed to avoid misleading readers. Do not overstate evidence or promise outcomes.
-- Write a short teaser paragraph, not an article summary or abstract. Start directly with the article's topic and one concrete context point. The first sentence must name the article's subject and give followers a reason to read on. Repeat the subject instead of opening with a pronoun such as “it,” “they,” “their,” or “these.” Hold back the full analysis.
-- Do not add an announcement or preamble such as "New on the website." The teaser must identify what the article is about and why it matters without vague filler.
-- Write in the publisher's official voice without naming or referring to the publisher. Use third person only. Let the article, analysis, research, or findings be the subject.
-- Never use first-person or second-person pronouns or contractions. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves. Do not quote first-person source language. Rephrase it in third person.
-- A topic-specific question is optional. Use one only when it sounds natural and adds genuine interest; do not turn a statement into a question by adding a question mark. Never return a question alone or use generic questions such as “What questions do these findings raise?” Do not address readers directly or use an imperative in the teaser paragraph.
-- Keep the voice ${context.tone}. Write for ${context.audience || "an interested general audience"}.
-- Campaign goal: ${context.campaignGoal || "raise awareness and invite readers to the full research resource"}.
-- Sound human and distinct for each platform, not like a template or detached summary. Avoid canned openings, exaggerated claims, detailed summaries, and repeated calls to action.
-- Use plain language and platform-appropriate formatting.
-- Add 2-4 specific hashtags that fit the article topic and the platform audience. Do not use generic tags such as #ResearchCommunication or #EvidenceInPractice. Do not repeat the same tags across platforms unless they genuinely fit each one.
-- Put hashtags only in the hashtags array. The copy button places hashtags before the final article call to action.
-- Do not use em dashes, en dashes, or double hyphens in the post content. Use commas, periods, or colons instead.
-- Do not use emojis.
-- The workflow appends the source URL and final call to action separately, so do not include either in the post content.
-- Keep the teaser paragraph within the character budget stated for its platform. The budget reserves space for hashtags and the article link CTA.
-- Keep posts brief enough to make readers curious, not fully informed. The article should contain the detail and analysis.
-- Every sentence must be complete. Never cut a sentence off to meet a length target.
-- Before returning, check every teaser paragraph for first-person and second-person wording. Rewrite any violation in third person.
-- Return only valid JSON in the shape {"drafts":[{"platform":"linkedin","content":"...","hashtags":["#Example"],"characterCount":0,"characterLimit":3000}]}.
-
-Source title: ${context.title}
-
-Source content:
-${context.content}
-
-Create one draft for each requested platform:
-${platformInstructions}`;
-}
-
-function buildPerspectiveCorrectionPrompt(rawText: string): string {
-  return `Rewrite the following JSON social posts in third person and keep the publisher unnamed.
-
-Rules:
-- Remove all first-person and second-person pronouns and contractions from the teaser paragraph. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves.
-- Keep supported claims, hashtags, and platform formats. Do not add facts. Remove any link line, since the workflow adds the final call to action.
-- Keep each post as a short teaser with one hook and no more than one supporting detail. Remove methods, extra findings, and article-summary language.
-- Use the platform's tone and a short, topic-focused question.
-- Keep the posts natural and inviting. Questions must focus on the research topic, not address the reader.
-- Return only valid JSON in the same shape as the input.
-
-Posts to revise:
-${rawText}`;
-}
-
-function extractJson(text: string): unknown {
-  const cleaned = text
-    .trim()
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/, "");
-  return JSON.parse(cleaned) as unknown;
-}
-
-function parseDrafts(
-  rawText: string,
-  requestedPlatforms: PlatformId[],
-): PlatformDraft[] {
-  const parsed = extractJson(rawText);
-  if (
-    parsed === null ||
-    typeof parsed !== "object" ||
-    !("drafts" in parsed) ||
-    !Array.isArray(parsed.drafts)
-  ) {
-    throw new Error("The selected AI provider returned an invalid draft response.");
-  }
-
-  const requested = new Set(requestedPlatforms);
-  const byPlatform = new Map<string, Record<string, unknown>>();
-  for (const item of parsed.drafts) {
-    if (item && typeof item === "object" && "platform" in item) {
-      byPlatform.set(String(item.platform), item as Record<string, unknown>);
-    }
-  }
-
-  return requestedPlatforms.map((platform) => {
-    const item = byPlatform.get(platform);
-    if (!item || typeof item.content !== "string" || !requested.has(platform)) {
-      throw new Error(`The selected AI provider did not return a valid ${platformNames[platform]} draft.`);
-    }
-    const excludedHashtags = new Set(["#researchcommunication", "#evidenceinpractice"]);
-    const hashtags = Array.isArray(item.hashtags)
-      ? item.hashtags
-          .filter((tag): tag is string => typeof tag === "string")
-          .map((tag) => {
-            const normalized = tag.trim().startsWith("#")
-              ? tag.trim()
-              : `#${tag.trim().replace(/^#+/, "")}`;
-            return normalized.replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u200D\u20E3]/gu, "");
-          })
-          .filter((tag, index, all) => !excludedHashtags.has(tag.toLowerCase()) && all.indexOf(tag) === index)
-          .slice(0, 4)
-      : [];
-    let content = item.content
+function normalizeHashtags(platform: PlatformId, value: unknown): string[] {
+  const policy = platformRules[platform];
+  if (!Array.isArray(value) || policy.maxHashtags === 0) return [];
+  const excluded = new Set(["#researchcommunication", "#evidenceinpractice"]);
+  const tags: string[] = [];
+  for (const rawTag of value) {
+    if (typeof rawTag !== "string") continue;
+    const body = rawTag
       .trim()
+      .replace(/^#+/, "")
+      .replace(/\s+/g, "")
       .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u200D\u20E3]/gu, "")
-      .replace(/\s*--+\s*/g, ", ")
-      .replace(/\s*[\u2012-\u2015]\s*/g, ", ")
-      .replace(/,\s*,+/g, ",")
-      .replace(/[ \t]{2,}/g, " ")
-      .replace(/[ \t]+\n/g, "\n")
-      .replace(/\n{3,}/g, "\n\n")
-      .replace(/#ResearchCommunication\b|#EvidenceInPractice\b/gi, "")
-      .trim();
-    for (const tag of hashtags) {
-      content = content.split(tag).join("").trim();
-    }
-    content = content.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+\n/g, "\n").trim();
-    const characterCount =
-      content.length + (hashtags.length ? hashtags.join(" ").length + 1 : 0);
-    return {
-      platform,
-      content,
-      hashtags,
-      characterCount,
-      characterLimit: characterLimits[platform],
-    };
-  });
+      .replace(/[^\p{L}\p{N}_-]/gu, "");
+    if (!body) continue;
+    const tag = `#${body}`;
+    if (!excluded.has(tag.toLowerCase()) && !tags.includes(tag)) tags.push(tag);
+  }
+  return tags.slice(0, policy.maxHashtags);
 }
 
-export async function generatePlatformDrafts(
-  context: GenerationContext,
-): Promise<GenerationResult> {
-  const prompt = buildPrompt(context);
-  const model = modelByProvider[context.provider];
-  let rawText = "";
-  let inputTokens = Math.ceil(prompt.length / 4);
-  let outputTokens = 0;
-  let anthropicClient: Anthropic | undefined;
+function hasNonThirdPersonText(text: string): boolean {
+  return forbiddenPerspectivePattern.test(text.replace(/https?:\/\/\S+/gi, ""));
+}
 
-  if (context.provider === "openai") {
+function copyText(content: string, hashtags: string[], sourceUrl: string | null): string {
+  const cta = sourceUrl
+    ? `Read the full article on our website: ${sourceUrl}`
+    : "";
+  return [content, hashtags.join(" "), cta].filter(Boolean).join("\n\n");
+}
+
+function splitCompleteSentences(content: string): string[] {
+  const sentences: string[] = [];
+  const boundary = /([.!?]+["'’”)]*)(\s+|$)/g;
+  let start = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = boundary.exec(content)) !== null) {
+    const end = match.index + match[1].length;
+    const rest = content.slice(boundary.lastIndex).trimStart();
+    if (match[1].startsWith(".") && /^[A-Z]\.\s+[a-z]/.test(rest)) continue;
+    if (match[1].startsWith(".") && /^[a-z]/.test(rest)) continue;
+
+    const sentence = content.slice(start, end).trim();
+    if (sentence) sentences.push(sentence);
+    start = boundary.lastIndex;
+  }
+
+  const remainder = content.slice(start).trim();
+  if (remainder) sentences.push(remainder);
+  return sentences;
+}
+
+function removeArticleOverviewSentences(content: string): string {
+  const articleOverview =
+    /^(?:(?:the|this) (?:full )?(?:article|analysis|essay|piece|study)|a new (?:article|essay) from)\b.*\b(?:walks?|maps?|covers?|explores?|examines?|traces?|outlines?|details?|discusses?|looks?|weighs?|considers?|describes?)\b/i;
+  return content
+    .split(/\n{2,}/)
+    .map((paragraph) =>
+      splitCompleteSentences(paragraph)
+        .filter((sentence) => !articleOverview.test(sentence.trim()))
+        .join(" "),
+    )
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+}
+
+function limitTeaserSentences(content: string, maximum: number): string {
+  const sentences = splitCompleteSentences(content);
+  if (sentences.length <= maximum) return content;
+  const lastQuestion = sentences
+    .slice()
+    .reverse()
+    .find((sentence) => /\?\s*["'’”)]*$/.test(sentence));
+  if (maximum === 1) return lastQuestion ?? sentences[0];
+  const kept = sentences.slice(0, Math.max(1, maximum - (lastQuestion ? 1 : 0)));
+  if (lastQuestion && !kept.includes(lastQuestion)) kept.push(lastQuestion);
+  return kept.join(" ").trim();
+}
+
+function bodyCharacterBudget(
+  maxCharacters: number,
+  hashtags: string[],
+  sourceUrl: string | null,
+): number {
+  const cta = sourceUrl
+    ? `Read the full article on our website: ${sourceUrl}`
+    : "";
+  const hashtagBlock = hashtags.join(" ");
+  const extraCharacters =
+    (cta ? cta.length + 2 : 0) +
+    (hashtagBlock ? hashtagBlock.length + 2 : 0);
+  return Math.max(0, maxCharacters - extraCharacters);
+}
+
+function trimAtClauseBoundary(content: string, characterBudget: number): string {
+  const boundaries = [...content.matchAll(/[,;:]/g)];
+  for (let index = boundaries.length - 1; index >= 0; index -= 1) {
+    const match = boundaries[index];
+    const cutAt = match.index;
+    if (cutAt === undefined || cutAt > characterBudget) continue;
+    const clause = content.slice(0, cutAt).trim();
+    const wordCount = clause.split(/\s+/).filter(Boolean).length;
+    if (
+      wordCount < 5 ||
+      /\b(?:and|or|but|because|with|for|to|from|of|the|a|an|as|by|in|on|at|that|which)$/i.test(
+        clause,
+      )
+    ) {
+      continue;
+    }
+    return `${clause.replace(/[.!?]+$/, "")}.`;
+  }
+  return "";
+}
+
+function compactToCharacterLimit(
+  content: string,
+  hashtags: string[],
+  sourceUrl: string | null,
+  maxCharacters: number,
+): string {
+  let compacted = content;
+  let sentences = splitCompleteSentences(content);
+  while (
+    copyText(compacted, hashtags, sourceUrl).length > maxCharacters &&
+    sentences.length > 1 &&
+    /[.!?]["'’”)]*$/.test(sentences[sentences.length - 1])
+  ) {
+    sentences = sentences.slice(0, -1);
+    compacted = sentences.join(" ");
+  }
+
+  if (copyText(compacted, hashtags, sourceUrl).length <= maxCharacters) {
+    return compacted;
+  }
+  const clause = trimAtClauseBoundary(
+    compacted,
+    bodyCharacterBudget(maxCharacters, hashtags, sourceUrl),
+  );
+  return clause || compacted;
+}
+
+function appendCta(content: string, sourceUrl: string | null): string {
+  if (!sourceUrl) return content;
+  return `${content}\n\nRead the full article on our website: ${sourceUrl}`;
+}
+
+async function requestModelText(
+  prompt: string,
+  provider: ProviderId,
+  model: string,
+  anthropicClient?: Anthropic,
+): Promise<ModelTextResponse> {
+  const estimatedInputTokens = Math.ceil(prompt.length / 4);
+  if (provider === "openai") {
     const response = await openai.chat.completions.create({
       model,
       max_completion_tokens: 8192,
       response_format: { type: "json_object" },
       messages: [{ role: "user", content: prompt }],
     });
-    rawText = response.choices[0]?.message?.content ?? "";
-    inputTokens = response.usage?.prompt_tokens ?? inputTokens;
-    outputTokens = response.usage?.completion_tokens ?? Math.ceil(rawText.length / 4);
-  } else if (context.provider === "anthropic") {
-    anthropicClient = getAnthropicClient();
-    const response = await anthropicClient.messages.create({
+    const text = response.choices[0]?.message?.content ?? "";
+    return {
+      text,
+      inputTokens: response.usage?.prompt_tokens ?? estimatedInputTokens,
+      outputTokens: response.usage?.completion_tokens ?? Math.ceil(text.length / 4),
+    };
+  }
+
+  if (provider === "anthropic") {
+    const client = anthropicClient ?? getAnthropicClient();
+    const response = await client.messages.create({
       model,
       max_tokens: 8192,
       thinking: { type: "disabled" },
       messages: [{ role: "user", content: prompt }],
     });
-    rawText = response.content
+    const text = response.content
       .filter((block) => block.type === "text")
       .map((block) => block.text)
       .join("");
-    inputTokens = response.usage.input_tokens ?? inputTokens;
-    outputTokens = response.usage.output_tokens ?? Math.ceil(rawText.length / 4);
-  } else {
-    const response = await ai.models.generateContent({
+    return {
+      text,
+      inputTokens: response.usage.input_tokens ?? estimatedInputTokens,
+      outputTokens: response.usage.output_tokens ?? Math.ceil(text.length / 4),
+    };
+  }
+
+  const response = await ai.models.generateContent({
+    model,
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    config: {
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json",
+    },
+  });
+  const text = response.text ?? "";
+  return {
+    text,
+    inputTokens: response.usageMetadata?.promptTokenCount ?? estimatedInputTokens,
+    outputTokens:
+      response.usageMetadata?.candidatesTokenCount ?? Math.ceil(text.length / 4),
+  };
+}
+
+async function generateArticleAnalysis(
+  context: GenerationContext,
+  model: string,
+  anthropicClient?: Anthropic,
+): Promise<{ analysis: ArticleAnalysis; usage: TokenUsage }> {
+  const prompt = buildAnalysisPrompt(context.title, context.content);
+  const first = await requestModelText(prompt, context.provider, model, anthropicClient);
+  try {
+    return { analysis: parseArticleAnalysis(first.text), usage: first };
+  } catch (error) {
+    const retryPrompt = buildAnalysisRetryPrompt(
+      context.title,
+      context.content,
+      first.text,
+      error instanceof Error ? error.message : "The response did not match the required schema.",
+    );
+    const retry = await requestModelText(
+      retryPrompt,
+      context.provider,
       model,
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      config: {
-        maxOutputTokens: 8192,
-        responseMimeType: "application/json",
-      },
-    });
-    rawText = response.text ?? "";
-    inputTokens = response.usageMetadata?.promptTokenCount ?? inputTokens;
-    outputTokens =
-      response.usageMetadata?.candidatesTokenCount ?? Math.ceil(rawText.length / 4);
-  }
-
-  if (!rawText) {
-    throw new Error("The selected AI provider returned an empty response.");
-  }
-
-  let drafts = parseDrafts(rawText, context.platforms);
-  if (hasNonThirdPersonDraft(drafts)) {
-    if (anthropicClient) {
-      try {
-        const correction = await anthropicClient.messages.create({
-          model,
-          max_tokens: 8192,
-          thinking: { type: "disabled" },
-          messages: [
-            {
-              role: "user",
-              content: buildPerspectiveCorrectionPrompt(rawText),
-            },
-          ],
-        });
-        const correctedText = correction.content
-          .filter((block) => block.type === "text")
-          .map((block) => block.text)
-          .join("");
-        inputTokens += correction.usage.input_tokens;
-        outputTokens += correction.usage.output_tokens;
-        if (correctedText) {
-          drafts = parseDrafts(correctedText, context.platforms);
-        }
-      } catch {
-        // Preserve the original drafts and apply deterministic cleanup below.
-      }
+      anthropicClient,
+    );
+    try {
+      return {
+        analysis: parseArticleAnalysis(retry.text),
+        usage: {
+          inputTokens: first.inputTokens + retry.inputTokens,
+          outputTokens: first.outputTokens + retry.outputTokens,
+        },
+      };
+    } catch (retryError) {
+      throw new Error(
+        `Article analysis was not valid after one retry: ${
+          retryError instanceof Error ? retryError.message : "invalid JSON response"
+        }`,
+      );
     }
   }
-  if (hasNonThirdPersonDraft(drafts)) {
-    drafts = enforceThirdPerson(drafts, context);
+}
+
+function parsePlatformResponse(
+  text: string,
+  platform: PlatformId,
+  analysis: ArticleAnalysis,
+): PlatformResponse {
+  const parsed = extractJson(text);
+  if (!isRecord(parsed) || parsed.platform !== platform || !Array.isArray(parsed.variants)) {
+    throw new Error(`The response must include ${platformNames[platform]} variants.`);
   }
-  drafts = makeBriefTeasers(drafts, context);
-  if (hasNonThirdPersonDraft(drafts)) {
-    throw new Error("Generated posts could not be kept in third-person language.");
+  const expectedCount = platform === "bluesky" ? 2 : 3;
+  if (parsed.variants.length !== expectedCount) {
+    throw new Error(`${platformNames[platform]} must return exactly ${expectedCount} variants.`);
   }
+  if (
+    typeof parsed.recommended_index !== "number" ||
+    !Number.isInteger(parsed.recommended_index) ||
+    parsed.recommended_index < 0 ||
+    parsed.recommended_index >= expectedCount
+  ) {
+    throw new Error(`${platformNames[platform]} recommended_index is invalid.`);
+  }
+
+  const analysisAngles = new Set(analysis.hook_angles.map((angle) => angle.angle));
+  const variants = parsed.variants.map((value, index): SingleVariant | ThreadVariant => {
+    if (!isRecord(value) || typeof value.angle !== "string") {
+      throw new Error(`${platformNames[platform]} variant ${index + 1} is missing its angle.`);
+    }
+    const angle = value.angle.trim().toLowerCase() as HookAngle;
+    if (!allowedHookAngles.has(angle) || !analysisAngles.has(angle)) {
+      throw new Error(`${platformNames[platform]} variant ${index + 1} uses an unsupported angle.`);
+    }
+    const format = value.format;
+    if (platform === "bluesky" && format === "thread") {
+      if (
+        !Array.isArray(value.posts) ||
+        value.posts.length < 2 ||
+        value.posts.length > 3 ||
+        value.posts.some((post) => typeof post !== "string" || !post.trim())
+      ) {
+        throw new Error("The Bluesky thread must contain 2–3 complete posts.");
+      }
+      return {
+        format: "thread",
+        angle,
+        posts: value.posts as string[],
+        hashtags: value.hashtags,
+      };
+    }
+    if (format !== "single" || typeof value.content !== "string") {
+      throw new Error(`${platformNames[platform]} variant ${index + 1} must be a single post.`);
+    }
+    return {
+      format: "single",
+      angle,
+      content: value.content,
+      hashtags: value.hashtags,
+    };
+  });
+
+  if (new Set(variants.map((variant) => variant.angle)).size !== variants.length) {
+    throw new Error(`${platformNames[platform]} variants must use distinct hook angles.`);
+  }
+  if (platform === "bluesky") {
+    if (
+      variants.filter((variant) => variant.format === "single").length !== 1 ||
+      variants.filter((variant) => variant.format === "thread").length !== 1 ||
+      parsed.recommended_index !== 0
+    ) {
+      throw new Error("Bluesky must return one single post and one thread, with the single post selected.");
+    }
+  } else if (variants.some((variant) => variant.format !== "single")) {
+    throw new Error(`${platformNames[platform]} variants must all be single posts.`);
+  }
+
+  return { variants, recommendedIndex: parsed.recommended_index };
+}
+
+function selectPlatformDraft(
+  response: PlatformResponse,
+  platform: PlatformId,
+  context: GenerationContext,
+): PlatformDraft {
+  const rules = platformRules[platform];
+  const singleVariants = response.variants
+    .map((variant, index) => ({ variant, index }))
+    .filter(
+      (entry): entry is { variant: SingleVariant; index: number } =>
+        entry.variant.format === "single",
+    );
+  const singleCandidates = singleVariants.map(({ variant, index }) => ({
+    content: variant.content,
+    hashtags: variant.hashtags,
+    index,
+  }));
+  const threadPostCandidates =
+    platform === "bluesky"
+      ? response.variants.flatMap((variant, index) =>
+          variant.format === "thread"
+            ? variant.posts.map((content, postIndex) => ({
+                content,
+                hashtags: variant.hashtags,
+                index: response.variants.length + index + postIndex,
+              }))
+            : [],
+        )
+      : [];
+  const candidates =
+    platform === "bluesky"
+      ? [...singleCandidates, ...threadPostCandidates]
+      : [
+          ...singleCandidates.filter((candidate) => candidate.index === response.recommendedIndex),
+          ...singleCandidates.filter((candidate) => candidate.index !== response.recommendedIndex),
+        ];
+  const rejected: string[] = [];
+
+  for (const candidate of candidates) {
+    let content = limitTeaserSentences(
+      removeArticleOverviewSentences(normalizeContent(candidate.content)),
+      rules.maxTeaserSentences,
+    );
+    if (!content) {
+      rejected.push("empty post text");
+      continue;
+    }
+    if (hasNonThirdPersonText(content)) {
+      rejected.push("first-person or second-person wording");
+      continue;
+    }
+    if (/\b(?:Economic Studies Group|the Group)\b/i.test(content)) {
+      rejected.push("publisher name in post text");
+      continue;
+    }
+
+    const hashtags = normalizeHashtags(platform, candidate.hashtags);
+    let fullText = copyText(content, hashtags, context.sourceUrl);
+    if (fullText.length > rules.maxCharacters) {
+      content = compactToCharacterLimit(
+        content,
+        hashtags,
+        context.sourceUrl,
+        rules.maxCharacters,
+      );
+      fullText = copyText(content, hashtags, context.sourceUrl);
+    }
+    const characterCount = fullText.length;
+    if (characterCount > rules.maxCharacters) {
+      rejected.push(`over ${rules.maxCharacters} characters`);
+      continue;
+    }
+    if (rules.minCharacters > 0 && characterCount < rules.minCharacters) {
+      rejected.push(`under ${rules.minCharacters} characters`);
+      continue;
+    }
+    if (hashtags.length < rules.minHashtags || hashtags.length > rules.maxHashtags) {
+      rejected.push("hashtag count outside platform policy");
+      continue;
+    }
+
+    return {
+      platform,
+      content: appendCta(content, context.sourceUrl),
+      hashtags,
+      characterCount,
+      characterLimit: rules.maxCharacters,
+    };
+  }
+
+  const issue = [...new Set(rejected)].join(", ") || "no eligible single-post variant";
+  throw new Error(
+    `No ${platformNames[platform]} variant passed validation (${issue}).`,
+  );
+}
+
+async function generateOnePlatform(
+  platform: PlatformId,
+  context: GenerationContext,
+  analysis: ArticleAnalysis,
+  model: string,
+  anthropicClient?: Anthropic,
+): Promise<{ draft: PlatformDraft; usage: TokenUsage }> {
+  const promptInput: PlatformPromptInput = {
+    platform,
+    title: context.title,
+    article: context.content,
+    sourceUrl: context.sourceUrl,
+    analysis,
+    tone: context.tone,
+    audience: context.audience,
+    campaignGoal: context.campaignGoal,
+  };
+  const prompt = buildPlatformPrompt(promptInput);
+  const first = await requestModelText(prompt, context.provider, model, anthropicClient);
+  try {
+    const parsed = parsePlatformResponse(first.text, platform, analysis);
+    return {
+      draft: selectPlatformDraft(parsed, platform, context),
+      usage: first,
+    };
+  } catch (error) {
+    const retryPrompt = buildPlatformRetryPrompt(
+      promptInput,
+      first.text,
+      error instanceof Error ? error.message : "The response did not pass validation.",
+    );
+    const retry = await requestModelText(
+      retryPrompt,
+      context.provider,
+      model,
+      anthropicClient,
+    );
+    try {
+      const parsed = parsePlatformResponse(retry.text, platform, analysis);
+      return {
+        draft: selectPlatformDraft(parsed, platform, context),
+        usage: {
+          inputTokens: first.inputTokens + retry.inputTokens,
+          outputTokens: first.outputTokens + retry.outputTokens,
+        },
+      };
+    } catch (retryError) {
+      throw new Error(
+        `${platformNames[platform]} posts were invalid after one retry: ${
+          retryError instanceof Error ? retryError.message : "invalid response"
+        }`,
+      );
+    }
+  }
+}
+
+export async function generatePlatformDrafts(
+  context: GenerationContext,
+): Promise<GenerationResult> {
+  const model = modelByProvider[context.provider];
+  const anthropicClient =
+    context.provider === "anthropic" ? getAnthropicClient() : undefined;
+  const { analysis, usage: analysisUsage } = await generateArticleAnalysis(
+    context,
+    model,
+    anthropicClient,
+  );
+  const platformResults = await Promise.all(
+    context.platforms.map((platform) =>
+      generateOnePlatform(platform, context, analysis, model, anthropicClient),
+    ),
+  );
 
   return {
     model,
-    drafts,
-    inputTokens,
-    outputTokens,
+    drafts: platformResults.map((result) => result.draft),
+    inputTokens:
+      analysisUsage.inputTokens +
+      platformResults.reduce((total, result) => total + result.usage.inputTokens, 0),
+    outputTokens:
+      analysisUsage.outputTokens +
+      platformResults.reduce((total, result) => total + result.usage.outputTokens, 0),
   };
 }
