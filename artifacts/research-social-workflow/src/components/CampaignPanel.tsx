@@ -91,16 +91,20 @@ function parsePostText(text: string): { content: string; hashtags: string[] } {
   };
 }
 
-function CampaignCard({
+export function CampaignCard({
   campaign,
   onReview,
   saving,
+  initialDrafts,
+  onDraftsChange,
 }: {
   campaign: Campaign;
   onReview: CampaignPanelProps["onReview"];
   saving: boolean;
+  initialDrafts?: PlatformDraft[];
+  onDraftsChange?: (drafts: PlatformDraft[]) => void;
 }) {
-  const [drafts, setDrafts] = useState<PlatformDraft[]>(() => campaign.outputs.map(cleanDraft));
+  const [drafts, setDrafts] = useState<PlatformDraft[]>(() => initialDrafts ?? campaign.outputs.map(cleanDraft));
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [copyErrorPlatform, setCopyErrorPlatform] = useState<string | null>(null);
   const copyDraft = async (draft: PlatformDraft) => {
@@ -119,14 +123,16 @@ function CampaignCard({
   };
   const updateDraft = (platform: string, postText: string) => {
     const parsed = parsePostText(postText);
-    setDrafts((current) => current.map((draft) => draft.platform === platform
+    const next = drafts.map((draft) => draft.platform === platform
       ? {
           ...draft,
           content: parsed.content,
           hashtags: parsed.hashtags,
           characterCount: getCopiedPostText(parsed.content, parsed.hashtags).length,
         }
-      : draft));
+      : draft);
+    setDrafts(next);
+    onDraftsChange?.(next);
   };
   return (
     <article className="campaign-card" data-testid={`campaign-card-${campaign.id}`}>

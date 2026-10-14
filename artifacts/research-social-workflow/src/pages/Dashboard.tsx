@@ -23,6 +23,7 @@ import type {
   SourceUpdate,
 } from "@workspace/api-client-react";
 import { CampaignPanel } from "../components/CampaignPanel";
+import { CampaignHistory } from "../components/CampaignHistory";
 import { SourcePanel } from "../components/SourcePanel";
 
 const platforms = [
@@ -407,16 +408,13 @@ function Dashboard() {
               onSave={handleSaveSource}
               onDelete={handleDeleteSource}
             />
-            <CampaignPanel
+            <CampaignHistory
               campaigns={campaigns}
               isLoading={campaignsQuery.isLoading}
               error={campaignsQuery.isError}
               onRetry={() => void campaignsQuery.refetch()}
               onReview={handleReview}
               savingId={reviewSavingId}
-              title="Post history"
-              emptyMessage="No posts saved yet"
-              emptyHint=""
             />
           </div>
           </section>

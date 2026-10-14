@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { ExternalLink, FileText, Pencil, Plus, Trash2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, FileText, Search, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { ContentSource, SourceInput, SourceUpdate } from "@workspace/api-client-react";
 
 type SourcePanelProps = {
@@ -28,6 +28,16 @@ export function SourcePanel({
   const [content, setContent] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
   const [formError, setFormError] = useState("");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 5;
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? sources.filter((s) => `${s.title} ${s.sourceUrl ?? ""}`.toLowerCase().includes(q)) : sources;
+  }, [sources, query]);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const visible = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   const openNew = () => {
     setEditing(null);
@@ -101,8 +111,22 @@ export function SourcePanel({
           <div style={{ marginTop: 5 }}>Save a house article or primer to start a draft.</div>
         </div>
       ) : (
+        <>
+        <div className="history-search">
+          <Search size={16} aria-hidden="true" />
+          <input
+            type="search"
+            className="input"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
+            placeholder="Search saved articles"
+            aria-label="Search saved articles"
+            data-testid="input-search-sources"
+          />
+        </div>
+        {filtered.length === 0 && <div className="empty-state" data-testid="empty-source-search"><strong>No articles match “{query}”</strong></div>}
         <div className="source-list">
-          {sources.map((source) => (
+          {visible.map((source) => (
             <article className="source-row" key={source.id} data-testid={`source-row-${source.id}`}>
               <div>
                 <div className="source-title" title={source.title} data-testid={`source-title-${source.id}`}>
@@ -150,6 +174,16 @@ export function SourcePanel({
             </article>
           ))}
         </div>
+        {filtered.length > pageSize && (
+          <nav className="history-pager" aria-label="Source library pages">
+            <span aria-live="polite">{(safePage - 1) * pageSize + 1}–{Math.min(safePage * pageSize, filtered.length)} of {filtered.length}</span>
+            <div>
+              <button className="button button-small" disabled={safePage === 1} onClick={() => setPage(safePage - 1)} data-testid="button-sources-prev"><ChevronLeft size={14} />Previous</button>
+              <button className="button button-small" disabled={safePage === pageCount} onClick={() => setPage(safePage + 1)} data-testid="button-sources-next">Next<ChevronRight size={14} /></button>
+            </div>
+          </nav>
+        )}
+        </>
       )}
       {modalOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
