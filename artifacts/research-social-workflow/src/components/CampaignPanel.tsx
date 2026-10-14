@@ -10,6 +10,8 @@ type CampaignPanelProps = {
   onReview: (campaign: Campaign, update: CampaignReviewUpdate) => void;
   savingId: number | null;
   title?: string;
+  emptyMessage?: string;
+  emptyHint?: string;
 };
 
 const providerNames: Record<string, string> = {
@@ -206,7 +208,11 @@ export function CampaignPanel({
   onReview,
   savingId,
   title = "Posts",
+  emptyMessage,
+  emptyHint,
 }: CampaignPanelProps) {
+  const resolvedEmptyMessage = emptyMessage ?? (title === "Previous posts" ? "No previous posts" : "No posts yet");
+  const resolvedEmptyHint = emptyHint ?? (title === "Posts" ? "Paste text or add a link above." : "");
   return (
     <section className="panel content-section" id="campaigns" data-testid="section-campaigns">
       <div className="panel-header">
@@ -230,8 +236,8 @@ export function CampaignPanel({
         </div>
       ) : campaigns.length === 0 ? (
         <div className="empty-state" data-testid="empty-campaigns">
-          <strong>{title === "Previous posts" ? "No previous posts" : "No posts yet"}</strong>
-          {title !== "Previous posts" && <div style={{ marginTop: 5 }}>Paste text or add a link above.</div>}
+          <strong>{resolvedEmptyMessage}</strong>
+          {resolvedEmptyHint && <div style={{ marginTop: 5 }}>{resolvedEmptyHint}</div>}
         </div>
       ) : (
         <div className="campaign-list">

@@ -76,28 +76,28 @@ export const platformRules: Record<
   bluesky: {
     minCharacters: 0,
     maxCharacters: 300,
-    preferredCharacters: 240,
+    preferredCharacters: 280,
     invitationMaxCharacters: 70,
     minHashtags: 0,
     maxHashtags: 2,
     style:
-      "Plain and direct. Turn one vivid, source-grounded detail into a concise open question, not a miniature summary. Use literal, neutral wording: no sarcasm, irony, or rhetorical reversals. Never imply that a de-peg demonstrates stability. Use up to two specific topic hashtags only when they help discovery; otherwise use none. Return one single-post option and one 2–3-post thread option. Keep every individual post, including a link when present, within 300 characters.",
+      "Plain and direct, but never cryptic. Name the article's subject and include one concrete fact or tension before raising the unresolved question. Keep the article's context ahead of author credits and hashtags. Use literal, neutral wording: no sarcasm, irony, or rhetorical reversals. Never imply that a de-peg demonstrates stability. Add topic hashtags only if they fit after the full context and link. Return one single-post option and one 2–3-post thread option. Keep every individual post, including a link when present, within 300 characters.",
     structure:
-      "The single-post option uses one short, source-grounded question or tension statement with enough context to name the topic. Continue naturally into the article or author reference in the same paragraph.",
+      "The single post uses one or two concise sentences: identify the topic and a specific finding or contrast, then make the unresolved question clear. A question must name its subject or clearly follow a concrete context sentence. If the full article link leaves little room, drop the byline and optional hashtags before cutting context. Do not add a generic article-summary sentence; the final link line is the invitation.",
     maxTeaserSentences: 2,
   },
   substack: {
-    minCharacters: 300,
+    minCharacters: 420,
     maxCharacters: 900,
-    preferredCharacters: 600,
+    preferredCharacters: 620,
     invitationMaxCharacters: 130,
     minHashtags: 0,
     maxHashtags: 2,
     style:
-      "Reflective and writerly. Open with a specific, unresolved question that makes the stakes clear, while leaving the article's explanation for the reader to discover. Use up to two relevant topic hashtags only when they feel natural and useful.",
+      "Reflective and writerly, with enough background for someone who has not read the article. Use two or three connected sentences to name the subject, ground the question in a concrete detail or finding, and show why the tension matters without giving away the answer. Add up to two relevant topic hashtags only when useful.",
     structure:
-      "Write one reflective paragraph that opens on a specific unresolved tension and naturally points readers to the article for the nuance behind it.",
-    maxTeaserSentences: 2,
+      "Write one contextual 2–3 sentence paragraph. Include the article's subject, one concrete source-grounded detail, and the unresolved implication that makes the full article worth reading. Do not rely on vague references such as 'this' or 'that' without naming what they mean.",
+    maxTeaserSentences: 3,
   },
   x: {
     minCharacters: 0,
@@ -203,7 +203,7 @@ export type PlatformPromptInput = {
 
 const genericTitleWords = new Set([
   "about", "after", "analysis", "article", "before", "brief", "economics",
-  "here", "how", "from", "into", "new", "overview", "paper", "published",
+  "here", "how", "from", "into", "new", "overview", "paper", "picture", "published",
   "report", "research", "study", "their", "there", "these", "those", "through",
   "what", "when", "where", "which", "while", "with",
 ]);
@@ -217,10 +217,11 @@ export function getTitleTopicTerms(title: string): string[] {
 export function buildPlatformPrompt(input: PlatformPromptInput): string {
   const rules = platformRules[input.platform];
   const isBluesky = input.platform === "bluesky";
+  const isSubstack = input.platform === "substack";
   const ctaLine = input.sourceUrl
     ? `Read the full article on our website: ${input.sourceUrl}`
     : "";
-  const hashtagReserve = rules.maxHashtags
+  const hashtagReserve = rules.maxHashtags && !isBluesky
     ? rules.maxHashtags * 32 + (rules.maxHashtags - 1) + 2
     : 0;
   const bodyBudget = Math.max(
@@ -239,6 +240,11 @@ export function buildPlatformPrompt(input: PlatformPromptInput): string {
   const variantInstructions = isBluesky
     ? `Return exactly two variants: one "single" post and one "thread" with 2–3 posts. The single post is the only option shown in the current review card.`
     : `Return exactly three single-post variants, each using a different hook angle. Set recommended_index to the zero-based index of the strongest variant for the current review card.`;
+  const lengthGuidance = isBluesky
+    ? "Use available characters for article context. Omit optional hashtags and the byline before dropping a useful fact or the unresolved question."
+    : isSubstack
+      ? "Aim for roughly 450–700 total characters. Use the extra room for a clear subject, concrete context, and stakes, not a longer summary."
+      : "Stay near the platform target unless another source detail is needed to make the hook clear.";
   const outputShape = isBluesky
     ? `{
   "platform": "bluesky",
@@ -265,7 +271,7 @@ Use the full article and its analysis JSON below. The article is the source of t
 Editorial rules:
 - Make the post sound like a human editor who understands the article, not generic marketing copy.
 - Open with a strong, article-specific hook drawn from hook_angles or best_details. A surprising result, contrast, consequence, or unresolved tension is stronger than a bare statistic.
-- Tease, do not summarize. Give enough context to understand the subject and why it matters, then leave one meaningful question unresolved. Do not reveal the full conclusion or list findings, benefits, risks, methods, categories, or recommendations.
+- Tease, do not summarize. Give enough context for someone unfamiliar with the article to understand its subject and why it matters, then leave one meaningful question unresolved. Do not reveal the full conclusion or list findings, benefits, risks, methods, categories, or recommendations.
 - The content field must contain a specific, source-grounded open question with a question mark. Bluesky may instead use one brief tension statement with an unresolved implication. Connect one verified detail or clear tension to a consequential unknown; a bare statistic or generic question is not a hook.
 - Name the economic subject or article-specific detail in the hook itself. Never open with a context-free reference such as “What is driving that reversal?” or “Why does this matter?”.
 - Build a curiosity gap: stop before the article answers that question. The invitation should make tapping feel worthwhile by pointing to a specific, surprising connection or unanswered implication, without giving that answer away.
@@ -281,7 +287,7 @@ Editorial rules:
 - Do not use emojis, em dashes, en dashes, or double hyphens.
 - Add hashtags only when they improve discovery on this platform. Keep them specific to the article, never generic campaign slogans. Hashtags belong in the hashtags array, not in content.
 - The application adds the final line “Read the full article on our website: ${input.sourceUrl ?? "[source URL unavailable]"}” after hashtags when a source URL is available. Do not put a CTA or URL in the generated content.
-- Character ranges include the final URL, CTA, line breaks, and hashtags. Keep each complete variant within the stated range; never cut a sentence to fit.
+- Character ranges include the final URL, CTA, line breaks, and hashtags. Keep each complete variant within the stated range; never cut a sentence to fit. For Bluesky, preserve the full contextual hook first and drop optional hashtags or byline if needed.
 - The content and invitation fields together should be at least ${minimumBodyBudget} characters when a minimum applies, and no longer than ${bodyBudget} characters before the application adds hashtags and the final CTA/link.
 - Tone preference: ${input.tone}. The article's voice_profile takes priority over generic tone defaults.
 - Intended audience: ${input.audience || input.analysis.audience}
@@ -290,7 +296,7 @@ Editorial rules:
 Platform: ${input.platform}
 Platform rules: ${rules.style}
 Character range: ${rules.minCharacters}–${rules.maxCharacters} total, including the application-added CTA/link and hashtags.
-Preferred total length: around ${rules.preferredCharacters} characters; stay near the shorter end unless extra context is essential.
+Preferred total length: around ${rules.preferredCharacters} characters. ${lengthGuidance}
 Hashtag count: ${rules.minHashtags}–${rules.maxHashtags}.
 Post structure: ${rules.structure}
 Invitation maximum: ${rules.invitationMaxCharacters} characters, including spaces.

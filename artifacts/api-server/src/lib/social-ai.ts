@@ -653,13 +653,25 @@ function selectPlatformDraft(
     return /\b(?:this|that|these|those)\s+(?:reversal|gap|shift|trend|change|question|result|pattern|difference)\b/i.test(opening) &&
       !titleTopicTerms.some((term) => opening.toLocaleLowerCase().includes(term));
   };
+  const hasArticleTopic = (text: string) =>
+    titleTopicTerms.length === 0 ||
+    titleTopicTerms
+      .slice(0, Math.min(2, titleTopicTerms.length))
+      .every((term) => text.toLocaleLowerCase().includes(term));
+  const blueBodyBudget = bodyCharacterBudget(rules.maxCharacters, [], context.sourceUrl);
+  const contextualDetail = analysis.best_details
+    .map((detail) => normalizeContent(detail.detail))
+    .find((text) => text && hasArticleTopic(text) && !hasUnanchoredDemonstrative(text)) ?? "";
+  const detailSentence = splitCompleteSentences(contextualDetail)[0] ?? contextualDetail;
+  const contextualQuestion = normalizeContent(questionHook);
+  const detailBudget = blueBodyBudget - contextualQuestion.length - 1;
+  const compactDetail = detailSentence.length <= detailBudget
+    ? detailSentence
+    : trimAtClauseBoundary(detailSentence, detailBudget);
   const contextualBlueskyHook = [
-    analysis.tension,
-    ...analysis.best_details.map((detail) => detail.detail),
-    questionHook,
-  ]
-    .map((text) => normalizeContent(text))
-    .find((text) => text && !hasUnanchoredDemonstrative(text)) ?? normalizeContent(questionHook);
+    compactDetail,
+    contextualQuestion,
+  ].filter(Boolean).join(" ");
   const singleVariants = response.variants
     .map((variant, index) => ({ variant, index }))
     .filter(
@@ -703,7 +715,8 @@ function selectPlatformDraft(
       platform === "bluesky" &&
       (!teaserSource ||
         !teaserSource.includes("?") ||
-        hasUnanchoredDemonstrative(teaserSource))
+        hasUnanchoredDemonstrative(teaserSource) ||
+        !hasArticleTopic(teaserSource))
     ) {
       teaserSource = contextualBlueskyHook;
     }
@@ -718,13 +731,15 @@ function selectPlatformDraft(
       );
     }
     let teaser = platform === "bluesky"
-      ? (splitCompleteSentences(teaserSource)[0] ?? "").trim()
+      ? limitTeaserSentences(teaserSource, rules.maxTeaserSentences)
       : limitTeaserSentences(
           teaserSource,
           Math.max(1, rules.maxTeaserSentences - 1),
         );
-    let invitation = limitTeaserSentences(normalizeContent(candidate.invitation), 1);
-    if (!teaser || !invitation) {
+    let invitation = platform === "bluesky"
+      ? ""
+      : limitTeaserSentences(normalizeContent(candidate.invitation), 1);
+    if (!teaser || (platform !== "bluesky" && !invitation)) {
       rejected.push("empty post text");
       continue;
     }
@@ -738,28 +753,30 @@ function selectPlatformDraft(
       text.length <= rules.invitationMaxCharacters &&
       hasInvitationSignal(text) &&
       !invitationIsGeneric(text);
-    if (invitation.length > rules.invitationMaxCharacters) {
-      const shortened = trimAtClauseBoundary(invitation, rules.invitationMaxCharacters);
-      if (shortened && isSuitableInvitation(shortened)) invitation = shortened;
+    if (platform !== "bluesky") {
+      if (invitation.length > rules.invitationMaxCharacters) {
+        const shortened = trimAtClauseBoundary(invitation, rules.invitationMaxCharacters);
+        if (shortened && isSuitableInvitation(shortened)) invitation = shortened;
+      }
+      if (!isSuitableInvitation(invitation)) {
+        invitation = fallbackInvitation;
+      }
+      if (invitation.length > rules.invitationMaxCharacters) {
+        rejected.push(`invitation exceeds ${rules.invitationMaxCharacters} characters`);
+        continue;
+      }
+      if (
+        invitationIsGeneric(invitation) ||
+        !hasInvitationSignal(invitation)
+      ) {
+        rejected.push("invitation is generic, summary-like, or lists article contents");
+        continue;
+      }
     }
-    if (!isSuitableInvitation(invitation)) {
-      invitation = fallbackInvitation;
-    }
-    if (invitation.length > rules.invitationMaxCharacters) {
-      rejected.push(`invitation exceeds ${rules.invitationMaxCharacters} characters`);
-      continue;
-    }
-    if (
-      invitationIsGeneric(invitation) ||
-      !hasInvitationSignal(invitation)
-    ) {
-      rejected.push("invitation is generic, summary-like, or lists article contents");
-      continue;
-    }
-    const hasOpenLoop =
-      teaser.includes("?") ||
-      /\b(?:but|yet|still|while|despite|although|however|could|may|might|whether|raises?|risk|uncertain|unknown)\b/i.test(teaser);
-    if (!hasOpenLoop) {
+    const hasOpenLoop = (text: string) =>
+      text.includes("?") ||
+      /\b(?:but|yet|still|while|despite|although|however|could|may|might|whether|raises?|risk|uncertain|unknown)\b/i.test(text);
+    if (!hasOpenLoop(teaser)) {
       rejected.push("teaser is missing a source-grounded curiosity question");
       continue;
     }
@@ -773,34 +790,43 @@ function selectPlatformDraft(
       continue;
     }
 
-    const hashtags = normalizeHashtags(platform, candidate.hashtags);
+    let hashtags = normalizeHashtags(platform, candidate.hashtags);
     let fullText = copyText(content, hashtags, context.sourceUrl);
+    if (platform === "bluesky" && fullText.length > rules.maxCharacters && hashtags.length) {
+      hashtags = [];
+      fullText = copyText(content, hashtags, context.sourceUrl);
+    }
     if (fullText.length > rules.maxCharacters) {
-      content = fitTeaserWithInvitation(
-        teaser,
-        invitation,
-        hashtags,
-        context.sourceUrl,
-        rules.maxCharacters,
-      );
-      if (!content && platform === "bluesky" && context.sourceUrl) {
-        const hookOnlyContent = fitTeaserWithInvitation(
+      if (platform === "bluesky") {
+        const questionSentence = splitCompleteSentences(teaser)
+          .find((sentence) => sentence.includes("?")) ?? "";
+        content = [teaser, questionSentence, contextualBlueskyHook]
+          .map(normalizeContent)
+          .filter((hook, index, options) =>
+            hook &&
+            options.indexOf(hook) === index &&
+            hasOpenLoop(hook) &&
+            hasArticleTopic(hook) &&
+            copyText(hook, hashtags, context.sourceUrl).length <= rules.maxCharacters,
+          )[0] ?? "";
+      } else {
+        content = fitTeaserWithInvitation(
           teaser,
-          "",
+          invitation,
           hashtags,
           context.sourceUrl,
           rules.maxCharacters,
         );
-        if (hookOnlyContent) {
-          content = hookOnlyContent;
-          fullText = copyText(content, hashtags, context.sourceUrl);
-        }
       }
       if (!content) {
         rejected.push(`over ${rules.maxCharacters} characters with required invitation`);
         continue;
       }
       fullText = copyText(content, hashtags, context.sourceUrl);
+    }
+    if (platform === "bluesky" && (!hasOpenLoop(content) || !hasArticleTopic(content))) {
+      rejected.push("Bluesky post lost its article context or open question after length fitting");
+      continue;
     }
     const characterCount = fullText.length;
     if (characterCount > rules.maxCharacters) {

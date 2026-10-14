@@ -48,6 +48,7 @@ function Dashboard() {
   const [articleUrl, setArticleUrl] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["linkedin", "facebook", "bluesky", "substack"]);
   const [activeCampaignId, setActiveCampaignId] = useState<number | null>(null);
+  const [activeView, setActiveView] = useState<"create" | "library">("create");
   const [notice, setNotice] = useState("");
   const [reviewSavingId, setReviewSavingId] = useState<number | null>(null);
 
@@ -123,6 +124,7 @@ function Dashboard() {
   };
 
   const generateForSource = (sourceId: number, selected: string[]) => {
+    setActiveView("create");
     generateCampaign.mutate(
       {
         data: {
@@ -221,7 +223,7 @@ function Dashboard() {
 
   return (
     <div className="simple-tool-shell">
-      <main className="simple-tool-main">
+      <main className={`simple-tool-main ${activeView === "library" ? "is-library-view" : ""}`}>
         <header className="simple-tool-header">
           <div>
             <h1>ESG Social Studio</h1>
@@ -233,6 +235,32 @@ function Dashboard() {
           </div>
         </header>
 
+        <div className="studio-layout">
+          <nav className="studio-side-tabs" aria-label="ESG Social Studio sections">
+            <button
+              type="button"
+              className={`studio-side-tab${activeView === "create" ? " is-active" : ""}`}
+              aria-current={activeView === "create" ? "page" : undefined}
+              onClick={() => setActiveView("create")}
+              data-testid="tab-create-posts"
+            >
+              <span>Create posts</span>
+              <small>Start a new draft</small>
+            </button>
+            <button
+              type="button"
+              className={`studio-side-tab${activeView === "library" ? " is-active" : ""}`}
+              aria-current={activeView === "library" ? "page" : undefined}
+              onClick={() => setActiveView("library")}
+              data-testid="tab-library-history"
+            >
+              <span>Library &amp; past posts</span>
+              <small>Saved articles and drafts</small>
+            </button>
+          </nav>
+          <div className="studio-view">
+            {activeView === "create" ? (
+              <>
         <section className="panel simple-generator" data-testid="panel-simple-generator">
           <div className="panel-header">
             <div>
@@ -332,9 +360,13 @@ function Dashboard() {
             savingId={reviewSavingId}
           />
         </div>
-
-        <details className="saved-content-disclosure">
-          <summary>Library and past posts</summary>
+              </>
+            ) : (
+          <section className="library-view" aria-labelledby="library-view-title" data-testid="view-library">
+            <header className="library-view-header">
+              <h2 id="library-view-title">Library &amp; past posts</h2>
+              <p>Saved articles, primers, and every generated draft.</p>
+            </header>
           <div className="history-grid">
             <SourcePanel
               sources={sources}
@@ -346,16 +378,21 @@ function Dashboard() {
               onDelete={handleDeleteSource}
             />
             <CampaignPanel
-              campaigns={pastCampaigns}
+              campaigns={campaigns}
               isLoading={campaignsQuery.isLoading}
               error={campaignsQuery.isError}
               onRetry={() => void campaignsQuery.refetch()}
               onReview={handleReview}
               savingId={reviewSavingId}
-              title="Previous posts"
+              title="Post history"
+              emptyMessage="No posts saved yet"
+              emptyHint=""
             />
           </div>
-        </details>
+          </section>
+            )}
+          </div>
+        </div>
 
         <footer className="simple-tool-footer">Drafts only. Nothing is published or scheduled from this tool.</footer>
       </main>

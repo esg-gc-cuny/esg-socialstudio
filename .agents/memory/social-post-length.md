@@ -13,8 +13,8 @@ Join the hook and article invitation into one coherent paragraph; keep optional 
 
 **How to apply:** When generating or postprocessing social copy, budget the final CTA and hashtags first, then keep complete hook sentences within the remaining space. Use a natural, article-specific transition; include a verified byline when it fits; add hashtags only when useful on that platform. Keep Bluesky especially concise and inspect the final copied text.
 
-For ESG Social Studio, use one selected, platform-specific teaser per platform. Never invent facts or author names; keep the article's explanation and conclusions for the reader to discover.
+For ESG Social Studio, use one selected, platform-specific teaser per platform. Bluesky and Substack need enough standalone context to name the subject, ground it in a concrete article detail, and make the open question clear. On Bluesky, drop the byline and optional hashtags before cutting context to fit the link. Never invent facts or author names; keep the article's explanation and conclusions for the reader to discover.
 
-**Why:** The user approved a simple one-draft-per-platform workflow and emphasized human, publisher-voice teasers that hook readers without giving away the full article.
+**Why:** The user approved a simple one-draft-per-platform workflow and emphasized human, publisher-voice teasers that hook readers without giving away the full article. They also noted that Bluesky and Substack drafts need more context.
 
-**How to apply:** Keep article analysis and alternate drafts out of the current UI unless requested. Preserve the full article-link line in the post and copy action, and use hashtags only where the platform calls for them.
+**How to apply:** Keep article analysis and alternate drafts out of the current UI unless requested. Preserve the full article-link line in the post and copy action, use hashtags only where the platform calls for them, and prioritize a named subject plus concrete detail on Bluesky and Substack.
