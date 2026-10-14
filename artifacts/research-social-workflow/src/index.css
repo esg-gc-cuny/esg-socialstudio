@@ -1270,6 +1270,19 @@ a {
   padding: 0 0 2px;
 }
 
+.article-link-row {
+  padding: 5px 0 2px;
+  font-size: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.article-link-row a {
+  color: hsl(var(--primary));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .hashtag {
   color: hsl(var(--primary));
   font: 9px var(--app-font-mono);

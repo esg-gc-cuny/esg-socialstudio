@@ -43,10 +43,26 @@ const platformNames: Record<string, string> = {
   linkedin: "LinkedIn",
   facebook: "Facebook",
   bluesky: "Bluesky",
-  substack: "Substack",
+  substack: "Substack Note",
   x: "X",
   instagram: "Instagram",
 };
+
+function splitArticleLink(content: string): { body: string; url: string } {
+  const match = content.match(
+    /(?:^|\n)[ \t]*(?:Full article:|The full article is available at)[ \t]*(https?:\/\/\S+)[ \t]*(?=\n|$)/im,
+  );
+  if (!match) return { body: content.trim(), url: "" };
+
+  const body = content
+    .replace(
+      /(?:^|\n)[ \t]*(?:Full article:|The full article is available at)[ \t]*https?:\/\/\S+[ \t]*(?=\n|$)/im,
+      "",
+    )
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return { body, url: match[1] };
+}
 
 function CampaignCard({
   campaign,
@@ -61,7 +77,12 @@ function CampaignCard({
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [copyErrorPlatform, setCopyErrorPlatform] = useState<string | null>(null);
   const copyDraft = async (draft: PlatformDraft) => {
-    const text = [draft.content, draft.hashtags.join(" ")].filter(Boolean).join("\n\n");
+    const { body, url } = splitArticleLink(draft.content);
+    const text = [
+      body,
+      draft.hashtags.join(" "),
+      url ? `Full article: ${url}` : "",
+    ].filter(Boolean).join("\n\n");
     try {
       await navigator.clipboard.writeText(text);
       setCopiedPlatform(draft.platform);
@@ -90,7 +111,9 @@ function CampaignCard({
         <span className="campaign-provider-label">{providerNames[campaign.provider] ?? campaign.provider}</span>
       </div>
       <div className="draft-stack" aria-label="Platform drafts">
-        {drafts.map((draft) => (
+        {drafts.map((draft) => {
+          const { body, url } = splitArticleLink(draft.content);
+          return (
           <div className="draft-editor" key={draft.platform}>
           <div className="draft-topline">
               <div className="draft-heading">
@@ -98,6 +121,7 @@ function CampaignCard({
                 <span
                   className={`draft-char${draft.characterCount > draft.characterLimit ? " over-limit" : ""}`}
                   data-testid={`draft-count-${campaign.id}-${draft.platform}`}
+                  aria-label={`${draft.characterCount} characters, recommended target ${draft.characterLimit}`}
                 >
                   {draft.characterCount} / {draft.characterLimit}
                 </span>
@@ -118,8 +142,11 @@ function CampaignCard({
           </div>
           <textarea
             className="textarea draft-copy"
-            value={draft.content}
-            onChange={(event) => updateDraft(draft.platform, event.target.value)}
+            value={body}
+            onChange={(event) => updateDraft(
+              draft.platform,
+              [event.target.value.trim(), url ? `Full article: ${url}` : ""].filter(Boolean).join("\n\n"),
+            )}
             aria-label={`${platformNames[draft.platform] ?? draft.platform} draft copy`}
             data-testid={`textarea-draft-${campaign.id}-${draft.platform}`}
           />
@@ -130,11 +157,17 @@ function CampaignCard({
               ))}
             </div>
           )}
+          {url && (
+            <div className="article-link-row" data-testid={`article-link-${campaign.id}-${draft.platform}`}>
+              Full article: <a href={url} target="_blank" rel="noreferrer">{url}</a>
+            </div>
+          )}
           {copyErrorPlatform === draft.platform && (
             <div className="copy-error" role="status">Could not copy. Try selecting and copying the text.</div>
           )}
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="campaign-actions">
         <div className="campaign-actions-left">

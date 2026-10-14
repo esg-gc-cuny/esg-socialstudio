@@ -29,7 +29,7 @@ const platforms = [
   { id: "linkedin", label: "LinkedIn" },
   { id: "facebook", label: "Facebook" },
   { id: "bluesky", label: "Bluesky" },
-  { id: "substack", label: "Substack" },
+  { id: "substack", label: "Substack Note" },
 ] as const;
 
 function Dashboard() {

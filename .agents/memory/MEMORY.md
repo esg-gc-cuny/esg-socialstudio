@@ -1,0 +1,1 @@
+- [Social post length handling](social-post-length.md) — Fit complete teaser sentences to platform budgets, never by cutting mid-sentence.
