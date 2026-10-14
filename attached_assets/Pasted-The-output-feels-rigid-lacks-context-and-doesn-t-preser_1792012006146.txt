@@ -1,0 +1,45 @@
+The output feels rigid, lacks context, and doesn't preserve the article's tone. Do NOT rebuild the app or change the UI layout. Only change the generation logic and prompts.
+
+## Change 1: Add an analysis step before generation
+Before writing any posts, make one LLM call that returns strict JSON (validate, retry once on parse failure):
+- core_thesis: main argument in one sentence
+- reader_payoff: what the reader gains
+- tension: the problem, surprise, or counterintuitive point driving the piece
+- best_details: 3-5 specific facts, numbers, quotes, or images taken directly from the text
+- voice_profile: formality (1-10), humor, sentence length, first-person use, jargon level, emotional register, signature phrases
+- audience: who it's for
+- hook_angles: 4 distinct options, each labeled (curiosity gap, bold claim, specific stat, personal story, question, contrarian)
+
+Pass this JSON plus the full article text into every platform generation call.
+
+## Change 2: Replace the current platform prompts with this system prompt
+Use it for every platform, with the platform block appended:
+
+"You write social posts promoting an article, in the voice of the article's author. Your goal is for the right reader to click, because they know what they're getting and want it.
+
+Rules:
+1. Match the voice_profile. If the article is dry, the post is dry. If it's warm, the post is warm. Never default to a generic marketing voice.
+2. Open with a hook drawn from the provided hook_angles or best_details. The first line must earn the second.
+3. After the hook, give 2-4 lines of real context: what the piece argues, why it matters, and one concrete detail from the article. The reader should understand the value before clicking.
+4. Tease the tension or payoff without giving away the conclusion, but give enough substance that the click feels informed rather than baited.
+5. Use only facts, numbers, and quotes found in the article. Never invent or exaggerate. Never promise what the article doesn't deliver.
+6. Vary structure. Don't reuse the same skeleton across variants or platforms.
+7. End with a low-key invitation to read. Vary the wording; never use a hard-sell CTA.
+8. Banned: 'game-changing', 'unlock', 'dive in', 'you won't believe', 'here's why', 'let that sink in', emoji bullet lists, 'It's not X, it's Y' constructions, more than one em dash per post, stacked three-item lists.
+
+Produce 3 variants per platform, each built on a different hook angle. Label each with the angle used."
+
+## Platform blocks (append to the system prompt)
+- LinkedIn: 600-1,300 chars. The hook must fit in the first ~200 chars (before "see more"). Short paragraphs. Professional but human. 0-3 relevant hashtags at the end.
+- Facebook: 300-700 chars. Conversational, lead with the human or relatable angle. Link at the end. No hashtags.
+- Bluesky: Hard limit 300 chars including the link. Give one single-post option and one 2-3 post thread option. Plain, direct, no hashtags.
+- Substack Notes: 300-900 chars. Reads like a writer sharing a thought, not an ad. More reflective and intimate. One clear invitation to read. No hashtags.
+
+## Change 3: Controls and plumbing
+- Run platform calls in parallel.
+- Add a "tone" setting (match article exactly <-> slightly punchier) and a "context" setting (short <-> more context) that adjust the generation prompt.
+- Add a refine box: send the current post plus a free-text instruction ("less formal", "lead with the stat") back to the model.
+- Keep prompts in a separate config/prompts file so they're easy to edit.
+- Show the analysis JSON in a collapsible panel so it can be edited and used to regenerate.
+
+Show me the final prompts before wiring them in.
