@@ -58,7 +58,11 @@ const forbiddenPerspectivePattern =
   /\b(?:i|me|my|mine|myself|we|us|our|ours|ourselves|you|your|yours|yourself|yourselves)\b|\b(?:i|we|you)[’'](?:m|ve|ll|d|re)\b/i;
 
 function containsNonThirdPersonText(text: string): boolean {
-  return forbiddenPerspectivePattern.test(text.replace(/https?:\/\/\S+/gi, ""));
+  const teaserText = text.replace(
+    /(?:^|\n)[ \t]*Read the full article on our website:[ \t]*https?:\/\/\S+[ \t]*(?=\n|$)/gim,
+    "",
+  );
+  return forbiddenPerspectivePattern.test(teaserText.replace(/https?:\/\/\S+/gi, ""));
 }
 
 function removePublisherName(content: string): string {
@@ -162,15 +166,6 @@ const shortPostTargets: Record<PlatformId, number> = {
   instagram: 350,
 };
 
-const platformInvitations: Record<PlatformId, string> = {
-  linkedin: "What does this suggest for economic policy?",
-  facebook: "Which question deserves more attention?",
-  bluesky: "What remains unresolved?",
-  substack: "Which question deserves a closer look?",
-  x: "What remains unresolved?",
-  instagram: "Which question deserves more attention?",
-};
-
 function shortenAtClauseBoundary(text: string, maxLength: number): string {
   const clauseBreak = /\s+(?:but|yet|while|although|though)\s+/i.exec(text);
   if (!clauseBreak || clauseBreak.index > maxLength) return "";
@@ -179,13 +174,42 @@ function shortenAtClauseBoundary(text: string, maxLength: number): string {
   return `${clause}.`;
 }
 
+function isNaturalTopicQuestion(sentence: string): boolean {
+  if (
+    /^(?:what questions do (?:these|the) findings raise|what remains unresolved|which question deserves more attention|what does this suggest)\??$/i.test(
+      sentence.trim(),
+    )
+  ) {
+    return false;
+  }
+  return (
+    sentence.includes("?") &&
+    /^(?:what|how|why|which|when|where|who|can|could|should|does|do|is|are|will|would)\b/i.test(
+      sentence.trim(),
+    )
+  );
+}
+
+function makeTitleFallback(title: string, maxLength: number): string {
+  let topic = title.split(/[:.!?]/u)[0].trim();
+  if (!topic) return "The article explores a timely economic question.";
+  const startsWithArticle = /^(?:the|a|an)\s/i.test(topic);
+  topic = topic.replace(/^(?:the|a|an)\s+/i, "").toLowerCase();
+  if (!startsWithArticle && /^(?:economics|effects?|impacts?|role|future|rise|growth|costs?|benefits?|risks?|relationship|case|markets?|policy|trade|labor|employment)\b/i.test(topic)) {
+    topic = `the ${topic}`;
+  }
+  const fallback = `The article examines ${topic}.`;
+  if (fallback.length <= maxLength) return fallback;
+  return maxLength >= 32 ? "The article examines this topic." : "";
+}
+
 function makeBriefTeasers(
   drafts: PlatformDraft[],
   context: GenerationContext,
 ): PlatformDraft[] {
   return drafts.map((draft) => {
     const platform = draft.platform as PlatformId;
-    const maxSentences =
+    const maxHookSentences =
       platform === "linkedin" || platform === "substack" ? 2 : 1;
     const safeSentences = removeNonThirdPersonSentences(
       removePublisherName(draft.content),
@@ -194,29 +218,45 @@ function makeBriefTeasers(
       .filter(Boolean)
       .filter((sentence) => !/\b(?:Economic Studies Group|the Group)\b/i.test(sentence))
       .filter((sentence) => !/\b(?:read|discussion|discuss|conversation|comments?|respond|response)\b/i.test(sentence))
-      .filter((sentence) => !context.sourceUrl || !sentence.includes(context.sourceUrl));
-    const topicQuestion = safeSentences.find((sentence) => sentence.includes("?"));
+      .filter((sentence) => !context.sourceUrl || !sentence.includes(context.sourceUrl))
+      .filter(Boolean);
+    const questionLimit: Record<PlatformId, number> = {
+      linkedin: 75,
+      facebook: 40,
+      bluesky: 28,
+      substack: 70,
+      x: 28,
+      instagram: 40,
+    };
+    const topicQuestion = safeSentences.find(
+      (sentence) =>
+        isNaturalTopicQuestion(sentence) &&
+        sentence.length <= questionLimit[platform],
+    );
     const hookCandidates = safeSentences
-      .filter((sentence) => sentence !== topicQuestion)
-      .slice(0, maxSentences);
+      .filter((sentence) => !sentence.includes("?"))
+      .filter((sentence) => !/^(?:it|they|their|these|those|this|its)\b/i.test(sentence))
+      .slice(0, maxHookSentences);
+    const compactHooks = hookCandidates.map((sentence) =>
+      sentence.replace(/,\s*[^,]{18,},/g, "").replace(/\s{2,}/g, " ").trim(),
+    );
     const hashtagsLength = draft.hashtags.length
-      ? draft.hashtags.join(" ").length + 1
+      ? draft.hashtags.join(" ").length + 2
       : 0;
     const contentLimit = Math.max(
       0,
       shortPostTargets[platform] - hashtagsLength,
     );
     const linkLine = context.sourceUrl
-      ? `Full article: ${context.sourceUrl}`
+      ? `Read the full article on our website: ${context.sourceUrl}`
       : "";
-    const invitation = topicQuestion || platformInvitations[platform];
-    const fixedLines = [invitation, linkLine].filter(Boolean);
+    const invitation = topicQuestion || "";
     const fixedLength =
-      fixedLines.join("\n\n").length +
-      (fixedLines.length ? 2 : 0);
+      (invitation ? invitation.length + 1 : 0) +
+      (linkLine ? linkLine.length + 2 : 0);
     const bodyBudget = Math.max(0, contentLimit - fixedLength);
     const selectedHooks: string[] = [];
-    for (const sentence of hookCandidates) {
+    for (const sentence of compactHooks) {
       const next = [...selectedHooks, sentence].join(" ");
       if (next.length <= bodyBudget) {
         selectedHooks.push(sentence);
@@ -225,17 +265,20 @@ function makeBriefTeasers(
       if (selectedHooks.length === 0) {
         const shortened = shortenAtClauseBoundary(sentence, bodyBudget);
         if (shortened) selectedHooks.push(shortened);
+        else continue;
       }
       break;
     }
     let body = selectedHooks.join(" ");
     let finalInvitation = invitation;
-    if (!body && platform === "bluesky" && topicQuestion) {
-      body = topicQuestion;
-      finalInvitation = "";
+    if (!body) {
+      body = makeTitleFallback(context.title, bodyBudget);
+      if (body && body.length + (finalInvitation ? finalInvitation.length + 1 : 0) > bodyBudget) {
+        finalInvitation = "";
+      }
     }
-    if (!body) body = "A timely economic question remains open.";
-    const content = [body, finalInvitation, linkLine].filter(Boolean).join("\n\n");
+    const teaserParagraph = [body, finalInvitation].filter(Boolean).join(" ");
+    const content = [teaserParagraph, linkLine].filter(Boolean).join("\n\n");
 
     return {
       ...draft,
@@ -243,7 +286,9 @@ function makeBriefTeasers(
       characterLimit: shortPostTargets[platform],
       characterCount:
         content.length +
-        (draft.hashtags.length ? draft.hashtags.join(" ").length + 1 : 0),
+        (draft.hashtags.length
+          ? draft.hashtags.join(" ").length + 2
+          : 0),
     };
   });
 }
@@ -252,16 +297,42 @@ function buildPrompt(context: GenerationContext): string {
   const platformInstructions = context.platforms
     .map((platform) => {
       const name = platformNames[platform];
-      const limit = characterLimits[platform];
+      const limit = shortPostTargets[platform];
+      const hashtagReserve: Record<PlatformId, number> = {
+        linkedin: 45,
+        facebook: 38,
+        bluesky: 24,
+        substack: 36,
+        x: 24,
+        instagram: 38,
+      };
+      const ctaLength = context.sourceUrl
+        ? `Read the full article on our website: ${context.sourceUrl}`.length + 4
+        : 0;
+      const paragraphCaps: Record<PlatformId, number> = {
+        linkedin: 260,
+        facebook: 100,
+        bluesky: 65,
+        substack: 220,
+        x: 65,
+        instagram: 100,
+      };
+      const bodyCharacterBudget = Math.max(
+        0,
+        Math.min(
+          paragraphCaps[platform],
+          limit - ctaLength - hashtagReserve[platform],
+        ),
+      );
       const style =
         platform === "substack"
-          ? "Write a Substack Note, not a newsletter post. Use a thoughtful, editorial tone with 2-3 brief sentences, about 300-500 total characters including hashtags and link. Open with one specific idea or tension, then a topic question. Keep it conversational and curiosity-driven, not promotional or summary-like."
+          ? `Write a Substack Note, not a newsletter post. Use a thoughtful, editorial teaser paragraph of 2 short sentences, about 25-35 words and no more than ${bodyCharacterBudget} characters before hashtags and the final link. Name the topic, add one concrete context point, and use a specific question only if it sounds natural.`
           : platform === "bluesky" || platform === "x"
-            ? "Write one concise, conversational post, targeting 200-280 characters including hashtags and link. Keep the hook sentence to 50-80 characters, then add one specific question. Leave room for replies, stay within 300 characters, and avoid formal setup or a summary."
+            ? `Write one concise, conversational teaser paragraph of 10-16 words and no more than ${bodyCharacterBudget} characters before hashtags and the final link. Name the topic and include one concrete context point. A short, specific question is optional; never return a question alone.`
             : platform === "linkedin"
-              ? "Write a credible, professional, insight-led teaser in 2-3 sentences, targeting 400-650 total characters including hashtags and link. Lead with a concrete finding or economic tension, add at most one reason it matters, then pose a policy-relevant question. Avoid jargon and sales language."
+              ? `Write a credible, professional, insight-led teaser paragraph of 2 sentences, about 30-40 words and no more than ${bodyCharacterBudget} characters before hashtags and the final link. Name the economic topic, add one specific fact or tension, and show why it matters. A policy question is optional if it sounds natural.`
               : platform === "facebook"
-                ? "Write an approachable, plain-language Page post in 1-2 short sentences, targeting 150-350 total characters including hashtags and link. Use one clear hook and a simple question that can invite comments. Keep it warm and accessible, not academic or salesy."
+                ? `Write an approachable, plain-language Page teaser paragraph of 1-2 short sentences, about 18-25 words and no more than ${bodyCharacterBudget} characters before hashtags and the final link. Name the topic and give one clear practical or economic implication. A short, specific question is optional.`
               : platform === "instagram"
                 ? "Use a short, accessible caption with a strong first line and a clear next step."
                 : "Write a warm, accessible post with a plain-language takeaway, the article link, and a relevant invitation to discuss.";
@@ -274,24 +345,24 @@ function buildPrompt(context: GenerationContext): string {
 Editorial rules:
 - Use only claims supported by the source. Never invent study results, statistics, quotes, authors, or implications.
 - Preserve uncertainty, limitations, and non-causal language when needed to avoid misleading readers. Do not overstate evidence or promise outcomes.
-- Write a short teaser, not an article summary or abstract. Lead with a concrete surprise, tension, or economic consequence. Use at most one supporting detail, and hold back the full analysis.
+- Write a short teaser paragraph, not an article summary or abstract. Start directly with the article's topic and one concrete context point. The first sentence must name the article's subject and give followers a reason to read on. Repeat the subject instead of opening with a pronoun such as “it,” “they,” “their,” or “these.” Hold back the full analysis.
+- Do not add an announcement or preamble such as "New on the website." The teaser must identify what the article is about and why it matters without vague filler.
 - Write in the publisher's official voice without naming or referring to the publisher. Use third person only. Let the article, analysis, research, or findings be the subject.
 - Never use first-person or second-person pronouns or contractions. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves. Do not quote first-person source language. Rephrase it in third person.
-- Invite readers to open the original article and engage with its topic through a platform-appropriate, topic-focused question. Do not address readers directly or use an imperative.
+- A topic-specific question is optional. Use one only when it sounds natural and adds genuine interest; do not turn a statement into a question by adding a question mark. Never return a question alone or use generic questions such as “What questions do these findings raise?” Do not address readers directly or use an imperative in the teaser paragraph.
 - Keep the voice ${context.tone}. Write for ${context.audience || "an interested general audience"}.
 - Campaign goal: ${context.campaignGoal || "raise awareness and invite readers to the full research resource"}.
 - Sound human and distinct for each platform, not like a template or detached summary. Avoid canned openings, exaggerated claims, detailed summaries, and repeated calls to action.
 - Use plain language and platform-appropriate formatting.
 - Add 2-4 specific hashtags that fit the article topic and the platform audience. Do not use generic tags such as #ResearchCommunication or #EvidenceInPractice. Do not repeat the same tags across platforms unless they genuinely fit each one.
-- Put hashtags only in the hashtags array, not in the post content. The copied post will place hashtags before the final article link.
+- Put hashtags only in the hashtags array. The copy button places hashtags before the final article call to action.
 - Do not use em dashes, en dashes, or double hyphens in the post content. Use commas, periods, or colons instead.
 - Do not use emojis.
-- Include the source URL in the copy when provided: ${context.sourceUrl || "No source URL provided"}.
-- Keep each post within the platform character limit after hashtags are included. Use the platform-specific target length, even when the platform allows much longer posts.
+- The workflow appends the source URL and final call to action separately, so do not include either in the post content.
+- Keep the teaser paragraph within the character budget stated for its platform. The budget reserves space for hashtags and the article link CTA.
 - Keep posts brief enough to make readers curious, not fully informed. The article should contain the detail and analysis.
 - Every sentence must be complete. Never cut a sentence off to meet a length target.
-- Before returning, check every post for first-person and second-person wording. Rewrite any violation in third person. Do not use direct-address questions or imperatives.
-- Put the full article link on its own final line, after the post text and call-to-action.
+- Before returning, check every teaser paragraph for first-person and second-person wording. Rewrite any violation in third person.
 - Return only valid JSON in the shape {"drafts":[{"platform":"linkedin","content":"...","hashtags":["#Example"],"characterCount":0,"characterLimit":3000}]}.
 
 Source title: ${context.title}
@@ -307,10 +378,10 @@ function buildPerspectiveCorrectionPrompt(rawText: string): string {
   return `Rewrite the following JSON social posts in third person and keep the publisher unnamed.
 
 Rules:
-- Remove all first-person and second-person pronouns and contractions. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves.
-- Keep supported claims, URLs, hashtags, and platform formats. Do not add facts.
+- Remove all first-person and second-person pronouns and contractions from the teaser paragraph. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves.
+- Keep supported claims, hashtags, and platform formats. Do not add facts. Remove any link line, since the workflow adds the final call to action.
 - Keep each post as a short teaser with one hook and no more than one supporting detail. Remove methods, extra findings, and article-summary language.
-- Use the platform's tone and a short, topic-focused question. Keep the full article link on the final line.
+- Use the platform's tone and a short, topic-focused question.
 - Keep the posts natural and inviting. Questions must focus on the research topic, not address the reader.
 - Return only valid JSON in the same shape as the input.
 

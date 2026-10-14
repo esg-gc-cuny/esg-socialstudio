@@ -35,7 +35,7 @@ function cleanDraft(draft: PlatformDraft): PlatformDraft {
     ...draft,
     content,
     hashtags,
-    characterCount: content.length + (hashtags.length ? hashtags.join(" ").length + 1 : 0),
+    characterCount: getCopiedPostText(content, hashtags).length,
   };
 }
 
@@ -50,18 +50,27 @@ const platformNames: Record<string, string> = {
 
 function splitArticleLink(content: string): { body: string; url: string } {
   const match = content.match(
-    /(?:^|\n)[ \t]*(?:Full article:|The full article is available at)[ \t]*(https?:\/\/\S+)[ \t]*(?=\n|$)/im,
+    /(?:^|\n)[ \t]*(?:Read the full article on our website:|Full article:|The full article is available at)[ \t]*(https?:\/\/\S+)[ \t]*(?=\n|$)/im,
   );
   if (!match) return { body: content.trim(), url: "" };
 
   const body = content
     .replace(
-      /(?:^|\n)[ \t]*(?:Full article:|The full article is available at)[ \t]*https?:\/\/\S+[ \t]*(?=\n|$)/im,
+      /(?:^|\n)[ \t]*(?:Read the full article on our website:|Full article:|The full article is available at)[ \t]*https?:\/\/\S+[ \t]*(?=\n|$)/im,
       "",
     )
     .replace(/\n{3,}/g, "\n\n")
     .trim();
   return { body, url: match[1] };
+}
+
+function getCopiedPostText(content: string, hashtags: string[]): string {
+  const { body, url } = splitArticleLink(content);
+  return [
+    body,
+    hashtags.join(" "),
+    url ? `Read the full article on our website: ${url}` : "",
+  ].filter(Boolean).join("\n\n");
 }
 
 function CampaignCard({
@@ -81,7 +90,7 @@ function CampaignCard({
     const text = [
       body,
       draft.hashtags.join(" "),
-      url ? `Full article: ${url}` : "",
+      url ? `Read the full article on our website: ${url}` : "",
     ].filter(Boolean).join("\n\n");
     try {
       await navigator.clipboard.writeText(text);
@@ -100,7 +109,7 @@ function CampaignCard({
       ? {
           ...draft,
           content,
-          characterCount: content.length + (draft.hashtags.length ? draft.hashtags.join(" ").length + 1 : 0),
+          characterCount: getCopiedPostText(content, draft.hashtags).length,
         }
       : draft));
   };
@@ -145,7 +154,7 @@ function CampaignCard({
             value={body}
             onChange={(event) => updateDraft(
               draft.platform,
-              [event.target.value.trim(), url ? `Full article: ${url}` : ""].filter(Boolean).join("\n\n"),
+              [event.target.value.trim(), url ? `Read the full article on our website: ${url}` : ""].filter(Boolean).join("\n\n"),
             )}
             aria-label={`${platformNames[draft.platform] ?? draft.platform} draft copy`}
             data-testid={`textarea-draft-${campaign.id}-${draft.platform}`}
@@ -159,7 +168,7 @@ function CampaignCard({
           )}
           {url && (
             <div className="article-link-row" data-testid={`article-link-${campaign.id}-${draft.platform}`}>
-              Full article: <a href={url} target="_blank" rel="noreferrer">{url}</a>
+              Read the full article on our website: <a href={url} target="_blank" rel="noreferrer">{url}</a>
             </div>
           )}
           {copyErrorPlatform === draft.platform && (
