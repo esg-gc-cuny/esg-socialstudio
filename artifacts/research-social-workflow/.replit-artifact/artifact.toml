@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Research Social Desk"
+description = "A content workflow for research groups to turn house articles and primers into platform-ready social and newsletter drafts, review them, and compare AI provider access and estimated costs."
+version = "1.0.0"
+id = "artifacts/research-social-workflow"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 26175
+
+[services.development]
+run = "pnpm --filter @workspace/research-social-workflow run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/research-social-workflow", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/research-social-workflow/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "26175"
+BASE_PATH = "/"

@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: research-social
+    description: Research content, platform drafts, reviews, and provider guidance
 paths:
   /healthz:
     get:
@@ -24,6 +26,181 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /sources:
+    get:
+      operationId: listSources
+      tags: [research-social]
+      summary: List research sources
+      responses:
+        "200":
+          description: Saved source articles and primers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContentSource"
+    post:
+      operationId: createSource
+      tags: [research-social]
+      summary: Save a research source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceInput"
+      responses:
+        "201":
+          description: Saved source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentSource"
+  /sources/{id}:
+    patch:
+      operationId: updateSource
+      tags: [research-social]
+      summary: Update a research source
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SourceUpdate"
+      responses:
+        "200":
+          description: Updated source
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContentSource"
+        "404":
+          description: Source not found
+    delete:
+      operationId: deleteSource
+      tags: [research-social]
+      summary: Delete a source and its campaigns
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Source and linked campaigns deleted
+        "404":
+          description: Source not found
+  /campaigns:
+    get:
+      operationId: listCampaigns
+      tags: [research-social]
+      summary: List generated campaigns
+      responses:
+        "200":
+          description: Saved platform campaigns
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Campaign"
+  /campaigns/generate:
+    post:
+      operationId: generateCampaign
+      tags: [research-social]
+      summary: Generate platform-specific draft copy from a research source
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignGenerationInput"
+      responses:
+        "201":
+          description: Generated campaign awaiting human review
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "400":
+          description: Invalid request or unsupported provider
+        "404":
+          description: Source not found
+  /campaigns/{id}:
+    patch:
+      operationId: reviewCampaign
+      tags: [research-social]
+      summary: Edit draft copy or update its review status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CampaignReviewUpdate"
+      responses:
+        "200":
+          description: Updated campaign
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Campaign"
+        "404":
+          description: Campaign not found
+    delete:
+      operationId: deleteCampaign
+      tags: [research-social]
+      summary: Delete a generated campaign
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Campaign deleted
+        "404":
+          description: Campaign not found
+  /dashboard:
+    get:
+      operationId: getDashboard
+      tags: [research-social]
+      summary: Get workflow counts and recent campaign activity
+      responses:
+        "200":
+          description: Workflow overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /providers:
+    get:
+      operationId: listProviders
+      tags: [research-social]
+      summary: List supported AI providers and cost guidance
+      responses:
+        "200":
+          description: Provider access and approximate direct API prices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProviderInfo"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +210,105 @@ components:
           type: string
       required:
         - status
+    ContentSource:
+      type: object
+      required: [id, title, content, sourceUrl, createdAt]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        content: { type: string }
+        sourceUrl: { type: ["string", "null"] }
+        createdAt: { type: string, format: date-time }
+    SourceInput:
+      type: object
+      required: [title, content]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        content: { type: string, minLength: 20, maxLength: 100000 }
+        sourceUrl: { type: string, format: uri }
+    SourceUpdate:
+      type: object
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        content: { type: string, minLength: 20, maxLength: 100000 }
+        sourceUrl: { type: ["string", "null"], format: uri }
+    PlatformDraft:
+      type: object
+      required: [platform, content, hashtags, characterCount, characterLimit]
+      properties:
+        platform: { type: string }
+        content: { type: string }
+        hashtags:
+          type: array
+          items: { type: string }
+        characterCount: { type: integer }
+        characterLimit: { type: integer }
+    Campaign:
+      type: object
+      required: [id, sourceId, sourceTitle, provider, model, status, tone, platforms, outputs, estimatedCostUsd, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        sourceId: { type: integer }
+        sourceTitle: { type: string }
+        provider: { type: string, enum: [openai, anthropic, gemini] }
+        model: { type: string }
+        status: { type: string, enum: [needs_review, approved, changes_requested] }
+        tone: { type: string }
+        platforms:
+          type: array
+          items: { type: string }
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformDraft"
+        estimatedCostUsd: { type: number }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CampaignGenerationInput:
+      type: object
+      required: [sourceId, provider, platforms, tone]
+      properties:
+        sourceId: { type: integer }
+        provider: { type: string, enum: [openai, anthropic, gemini] }
+        platforms:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            enum: [linkedin, facebook, bluesky, substack, x, instagram]
+        tone: { type: string, minLength: 1, maxLength: 120 }
+        audience: { type: string, maxLength: 200 }
+        campaignGoal: { type: string, maxLength: 200 }
+    CampaignReviewUpdate:
+      type: object
+      properties:
+        status: { type: string, enum: [needs_review, approved, changes_requested] }
+        outputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlatformDraft"
+    DashboardSummary:
+      type: object
+      required: [sourceCount, campaignCount, needsReviewCount, approvedCount, recentCampaigns]
+      properties:
+        sourceCount: { type: integer }
+        campaignCount: { type: integer }
+        needsReviewCount: { type: integer }
+        approvedCount: { type: integer }
+        recentCampaigns:
+          type: array
+          items:
+            $ref: "#/components/schemas/Campaign"
+    ProviderInfo:
+      type: object
+      required: [id, name, model, apiAccess, inputUsdPerMillion, outputUsdPerMillion, pricingUrl, note]
+      properties:
+        id: { type: string, enum: [openai, anthropic, gemini, copilot] }
+        name: { type: string }
+        model: { type: string }
+        apiAccess: { type: string }
+        inputUsdPerMillion: { type: ["number", "null"] }
+        outputUsdPerMillion: { type: ["number", "null"] }
+        pricingUrl: { type: string }
+        note: { type: string }
 
