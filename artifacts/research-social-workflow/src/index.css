@@ -79,33 +79,33 @@
   --elevate-1: rgba(0, 0, 0, 0.03);
   --elevate-2: rgba(0, 0, 0, 0.08);
 
-  --background: 42 34% 96%;
+  --background: 42 31% 94%;
 
-  --foreground: 222 22% 16%;
+  --foreground: 202 31% 17%;
 
-  --border: 38 18% 84%;
+  --border: 38 18% 82%;
 
-  --card: 42 30% 99%;
+  --card: 42 38% 98%;
 
-  --card-foreground: 222 22% 16%;
+  --card-foreground: 202 31% 17%;
 
-  --card-border: 38 18% 84%;
+  --card-border: 38 18% 82%;
 
-  --sidebar: 222 22% 16%;
+  --sidebar: 202 31% 17%;
 
-  --sidebar-foreground: 42 34% 96%;
+  --sidebar-foreground: 42 31% 94%;
 
-  --sidebar-border: 222 16% 27%;
+  --sidebar-border: 202 19% 29%;
 
-  --sidebar-primary: 160 28% 58%;
+  --sidebar-primary: 39 57% 66%;
 
-  --sidebar-primary-foreground: 222 22% 16%;
+  --sidebar-primary-foreground: 202 31% 17%;
 
-  --sidebar-accent: 222 17% 24%;
+  --sidebar-accent: 202 24% 23%;
 
-  --sidebar-accent-foreground: 42 34% 96%;
+  --sidebar-accent-foreground: 42 31% 94%;
 
-  --sidebar-ring: 160 28% 58%;
+  --sidebar-ring: 39 57% 66%;
 
   --popover: 42 30% 99%;
 
@@ -113,9 +113,9 @@
 
   --popover-border: 38 18% 84%;
 
-  --primary: 160 28% 34%;
+  --primary: 163 28% 31%;
 
-  --primary-foreground: 42 34% 97%;
+  --primary-foreground: 42 38% 98%;
 
   --secondary: 38 25% 90%;
 
@@ -125,7 +125,7 @@
 
   --muted-foreground: 218 10% 46%;
 
-  --accent: 16 56% 53%;
+  --accent: 36 56% 48%;
 
   --accent-foreground: 42 34% 97%;
 
@@ -134,9 +134,9 @@
   --destructive-foreground: 42 34% 97%;
 
   --input: 38 18% 84%;
-  --ring: 160 28% 34%;
-  --chart-1: 160 28% 34%;
-  --chart-2: 16 56% 53%;
+  --ring: 163 28% 31%;
+  --chart-1: 163 28% 31%;
+  --chart-2: 36 56% 48%;
   --chart-3: 215 20% 42%;
   --chart-4: 44 64% 56%;
   --chart-5: 285 18% 54%;
@@ -318,6 +318,296 @@
 
   body {
     @apply font-sans antialiased bg-background text-foreground;
+  }
+}
+
+/* Economic Studies Group — editorial paper, ink and restrained field-green. */
+.simple-tool-shell {
+  min-height: 100dvh;
+  background:
+    linear-gradient(90deg, transparent 0, transparent calc(50% - 1px), hsl(38 18% 82% / .22) 50%, transparent calc(50% + 1px)),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 16px;
+}
+
+.simple-tool-main {
+  width: min(100%, 920px);
+  padding: 48px 30px 64px;
+}
+
+.simple-tool-header {
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 28px;
+  padding: 0 0 24px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.simple-tool-header .brand-mark {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border-color: hsl(var(--primary) / .32);
+  background: hsl(var(--primary) / .07);
+  color: hsl(var(--primary));
+}
+
+.simple-tool-header h1 {
+  font-size: clamp(38px, 5vw, 54px);
+  line-height: 1;
+  letter-spacing: -.045em;
+}
+
+.simple-tool-header p {
+  max-width: 540px;
+  margin-top: 11px;
+  color: hsl(var(--muted-foreground));
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.panel {
+  border-color: hsl(var(--border));
+  border-radius: 3px;
+  box-shadow: 0 9px 28px hsl(202 24% 24% / .045);
+}
+
+.simple-generator {
+  margin-top: 0;
+  border-top: 3px solid hsl(var(--primary));
+}
+
+.simple-generator .panel-header {
+  padding: 22px 26px 18px;
+}
+
+.simple-generator .panel-title {
+  font-size: 27px;
+  letter-spacing: -.025em;
+}
+
+.simple-generator .panel-body {
+  padding: 25px 26px 28px;
+  gap: 19px;
+}
+
+.model-label {
+  padding: 6px 10px;
+  border: 1px solid hsl(var(--primary) / .22);
+  border-radius: 2px;
+  background: hsl(var(--primary) / .06);
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+
+.article-mode-toggle {
+  gap: 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.article-mode-button {
+  min-height: 43px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  font-size: 15px;
+}
+
+.article-mode-button.is-active {
+  border-bottom-color: hsl(var(--primary));
+  background: transparent;
+  color: hsl(var(--primary));
+}
+
+.simple-generator .field label,
+.simple-generator .platform-picker-heading > label {
+  font: 600 16px/1.35 var(--app-font-sans);
+  color: hsl(var(--foreground));
+}
+
+.simple-generator .input,
+.simple-generator .textarea {
+  border-radius: 2px;
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  font-size: 17px;
+}
+
+.simple-source-content {
+  min-height: 270px;
+  line-height: 1.65;
+}
+
+.simple-generator .platform-picker {
+  gap: 10px;
+}
+
+.simple-generator .platform-option span {
+  min-height: 47px;
+  border-radius: 2px;
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.simple-generator .platform-option input:checked + span {
+  border-color: hsl(var(--primary) / .55);
+  background: hsl(var(--primary) / .08);
+  color: hsl(var(--primary));
+}
+
+.simple-tool-shell .button {
+  min-height: 42px;
+  border-radius: 2px;
+  font-size: 14px;
+}
+
+.simple-tool-shell .button-primary {
+  min-height: 48px;
+  padding-inline: 22px;
+  font-weight: 600;
+}
+
+.simple-tool-shell .button-primary:hover:not(:disabled) {
+  background: hsl(163 30% 25%);
+  color: hsl(var(--primary-foreground));
+}
+
+.results-area {
+  margin-top: 26px;
+}
+
+.content-section > .panel-header {
+  padding: 20px 24px;
+}
+
+.content-section .panel-title {
+  font-size: 24px;
+}
+
+.campaign-card {
+  padding: 22px 24px;
+  animation: rise-in .35s both;
+}
+
+.simple-tool-shell .campaign-source {
+  font-family: var(--app-font-serif);
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.draft-editor {
+  border-radius: 2px;
+  border-color: hsl(var(--border));
+  background: hsl(42 38% 97%);
+  padding: 10px 14px;
+}
+
+.simple-tool-shell .textarea.draft-copy {
+  min-height: 145px;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.simple-tool-shell .field-label {
+  font-size: 15px;
+}
+
+.simple-tool-shell .draft-char,
+.simple-tool-shell .hashtag,
+.simple-tool-shell .copy-error {
+  font-size: 13px;
+}
+
+.simple-tool-shell .button-small {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+.saved-content-disclosure {
+  margin-top: 28px;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 17px;
+}
+
+.saved-content-disclosure > summary {
+  min-height: 42px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.simple-tool-footer {
+  margin-top: 32px;
+  padding-top: 17px;
+  border-top: 1px solid hsl(var(--border));
+  font: 13px/1.5 var(--app-font-sans);
+}
+
+.toast-message {
+  border-radius: 2px;
+  font-size: 15px;
+}
+
+@media (max-width: 640px) {
+  .simple-tool-shell {
+    background: hsl(var(--background));
+  }
+
+  .simple-tool-main {
+    padding: 28px 16px 42px;
+  }
+
+  .simple-tool-header {
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 19px;
+  }
+
+  .simple-tool-header .brand-mark {
+    flex-basis: 39px;
+    width: 39px;
+    height: 39px;
+  }
+
+  .simple-tool-header h1 {
+    font-size: 37px;
+  }
+
+  .simple-tool-header p {
+    font-size: 15px;
+  }
+
+  .simple-generator .panel-header,
+  .content-section > .panel-header {
+    padding: 17px 16px;
+  }
+
+  .simple-generator .panel-body {
+    padding: 19px 16px 21px;
+    gap: 17px;
+  }
+
+  .campaign-card {
+    padding: 18px 16px;
+  }
+
+  .draft-topline {
+    align-items: flex-start;
+  }
+
+  .simple-tool-shell .textarea.draft-copy {
+    min-height: 160px;
+    font-size: 16px;
+  }
+
+  .saved-content-disclosure > summary {
+    font-size: 16px;
   }
 }
 
@@ -1771,4 +2061,306 @@ a {
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+}
+
+/* Final application layer: keep the simple, editorial desk above legacy scaffold rules. */
+.simple-tool-shell {
+  min-height: 100dvh;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 16px;
+}
+
+.simple-tool-shell .simple-tool-main {
+  width: min(100%, 920px);
+  padding: 48px 30px 64px;
+}
+
+.simple-tool-shell .simple-tool-header {
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 28px;
+  padding: 0 0 24px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.simple-tool-shell .simple-tool-header .brand-mark {
+  flex: 0 0 46px;
+  width: 46px;
+  height: 46px;
+  margin-top: 5px;
+  border-radius: 50%;
+  border-color: hsl(var(--primary) / .32);
+  background: hsl(var(--primary) / .07);
+  color: hsl(var(--primary));
+}
+
+.simple-tool-shell .simple-tool-header h1 {
+  font-size: clamp(38px, 5vw, 54px);
+  line-height: 1;
+  letter-spacing: -.045em;
+}
+
+.simple-tool-shell .simple-tool-header p {
+  max-width: 540px;
+  margin-top: 11px;
+  color: hsl(var(--muted-foreground));
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.simple-tool-shell .panel {
+  border-color: hsl(var(--border));
+  border-radius: 3px;
+  box-shadow: 0 9px 28px hsl(202 24% 24% / .045);
+}
+
+.simple-tool-shell .simple-generator {
+  margin-top: 0;
+  border-top: 3px solid hsl(var(--primary));
+}
+
+.simple-tool-shell .simple-generator .panel-header {
+  padding: 22px 26px 18px;
+}
+
+.simple-tool-shell .simple-generator .panel-title {
+  font-size: 27px;
+  letter-spacing: -.025em;
+}
+
+.simple-tool-shell .simple-generator .panel-body {
+  padding: 25px 26px 28px;
+  gap: 19px;
+}
+
+.simple-tool-shell .model-label {
+  padding: 6px 10px;
+  border: 1px solid hsl(var(--primary) / .22);
+  border-radius: 2px;
+  background: hsl(var(--primary) / .06);
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+
+.simple-tool-shell .article-mode-toggle {
+  gap: 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.simple-tool-shell .article-mode-button {
+  min-height: 43px;
+  padding: 0 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  font-size: 15px;
+}
+
+.simple-tool-shell .article-mode-button.is-active {
+  border-bottom-color: hsl(var(--primary));
+  background: transparent;
+  color: hsl(var(--primary));
+}
+
+.simple-tool-shell .simple-generator .field label,
+.simple-tool-shell .simple-generator .platform-picker-heading > label {
+  font: 600 16px/1.35 var(--app-font-sans);
+  color: hsl(var(--foreground));
+}
+
+.simple-tool-shell .simple-generator .input,
+.simple-tool-shell .simple-generator .textarea {
+  border-radius: 2px;
+  border-color: hsl(var(--border));
+  background: hsl(var(--card));
+  font-size: 17px;
+}
+
+.simple-tool-shell .simple-source-content {
+  min-height: 270px;
+  line-height: 1.65;
+}
+
+.simple-tool-shell .simple-generator .platform-picker {
+  gap: 10px;
+}
+
+.simple-tool-shell .simple-generator .platform-option span {
+  min-height: 47px;
+  border-radius: 2px;
+  border-color: hsl(var(--border));
+  color: hsl(var(--foreground));
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.simple-tool-shell .simple-generator .platform-option input:checked + span {
+  border-color: hsl(var(--primary) / .55);
+  background: hsl(var(--primary) / .08);
+  color: hsl(var(--primary));
+}
+
+.simple-tool-shell .button {
+  min-height: 42px;
+  border-radius: 2px;
+  font-size: 14px;
+}
+
+.simple-tool-shell .button-primary {
+  min-height: 48px;
+  padding-inline: 22px;
+  font-weight: 600;
+}
+
+.simple-tool-shell .button-primary:hover:not(:disabled) {
+  background: hsl(163 30% 25%);
+  color: hsl(var(--primary-foreground));
+}
+
+.simple-tool-shell .results-area {
+  margin-top: 26px;
+}
+
+.simple-tool-shell .content-section > .panel-header {
+  padding: 20px 24px;
+}
+
+.simple-tool-shell .content-section .panel-title {
+  font-size: 24px;
+}
+
+.simple-tool-shell .campaign-card {
+  padding: 22px 24px;
+}
+
+.simple-tool-shell .campaign-source {
+  font-family: var(--app-font-serif);
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.simple-tool-shell .draft-editor {
+  border-radius: 2px;
+  border-color: hsl(var(--border));
+  background: hsl(42 38% 97%);
+  padding: 10px 14px;
+}
+
+.simple-tool-shell .textarea.draft-copy {
+  min-height: 145px;
+  font-size: 17px;
+  line-height: 1.65;
+}
+
+.simple-tool-shell .field-label {
+  font-size: 15px;
+}
+
+.simple-tool-shell .draft-char,
+.simple-tool-shell .hashtag,
+.simple-tool-shell .copy-error {
+  font-size: 13px;
+}
+
+.simple-tool-shell .button-small {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+.simple-tool-shell .saved-content-disclosure {
+  margin-top: 28px;
+  border-top: 1px solid hsl(var(--border));
+  padding-top: 17px;
+}
+
+.simple-tool-shell .saved-content-disclosure > summary {
+  min-height: 42px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.simple-tool-shell .simple-tool-footer {
+  margin-top: 32px;
+  padding-top: 17px;
+  border-top: 1px solid hsl(var(--border));
+  font: 13px/1.5 var(--app-font-sans);
+}
+
+@media (max-width: 640px) {
+  .simple-tool-shell .simple-tool-main {
+    padding: 28px 16px 42px;
+  }
+
+  .simple-tool-shell .simple-tool-header {
+    gap: 12px;
+    margin-bottom: 20px;
+    padding-bottom: 19px;
+  }
+
+  .simple-tool-shell .simple-tool-header .brand-mark {
+    flex-basis: 39px;
+    width: 39px;
+    height: 39px;
+  }
+
+  .simple-tool-shell .simple-tool-header h1 {
+    font-size: 37px;
+  }
+
+  .simple-tool-shell .simple-tool-header p {
+    font-size: 15px;
+  }
+
+  .simple-tool-shell .simple-generator .panel-header,
+  .simple-tool-shell .content-section > .panel-header {
+    padding: 17px 16px;
+  }
+
+  .simple-tool-shell .simple-generator .panel-body {
+    padding: 19px 16px 21px;
+    gap: 17px;
+  }
+
+  .simple-tool-shell .campaign-card {
+    padding: 18px 16px;
+  }
+
+  .simple-tool-shell .textarea.draft-copy {
+    min-height: 160px;
+    font-size: 16px;
+  }
+
+  .simple-tool-shell .saved-content-disclosure > summary {
+    font-size: 16px;
+  }
+}
+
+.simple-tool-shell,
+.simple-tool-shell button,
+.simple-tool-shell .button,
+.simple-tool-shell input,
+.simple-tool-shell textarea,
+.simple-tool-shell select,
+.simple-tool-shell summary,
+.simple-tool-shell .platform-tab,
+.simple-tool-shell .platform-option span,
+.simple-tool-shell .saved-content-disclosure > summary span,
+.simple-tool-shell .model-label,
+.simple-tool-shell .campaign-provider-label,
+.simple-tool-shell .field-label,
+.simple-tool-shell .draft-char,
+.simple-tool-shell .hashtag,
+.simple-tool-shell .simple-generator .field label,
+.simple-tool-shell .simple-generator .platform-picker-heading > label,
+.simple-tool-shell .simple-tool-footer {
+  font-family: var(--app-font-serif);
+}
+
+.simple-tool-shell .field label {
+  font-family: var(--app-font-serif);
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
 }

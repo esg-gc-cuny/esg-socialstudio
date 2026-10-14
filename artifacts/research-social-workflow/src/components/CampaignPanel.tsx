@@ -21,8 +21,11 @@ const providerNames: Record<string, string> = {
 const excludedHashtags = new Set(["#researchcommunication", "#evidenceinpractice"]);
 
 function cleanDraft(draft: PlatformDraft): PlatformDraft {
-  const hashtags = draft.hashtags.filter((tag) => !excludedHashtags.has(tag.toLowerCase()));
+  const hashtags = draft.hashtags
+    .map((tag) => tag.replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u200D\u20E3]/gu, ""))
+    .filter((tag) => tag.length > 1 && !excludedHashtags.has(tag.toLowerCase()));
   const content = draft.content
+    .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u200D\u20E3]/gu, "")
     .replace(/\s*--+\s*/g, ", ")
     .replace(/\s*[\u2012-\u2015]\s*/g, ", ")
     .replace(/#ResearchCommunication\b|#EvidenceInPractice\b/gi, "")

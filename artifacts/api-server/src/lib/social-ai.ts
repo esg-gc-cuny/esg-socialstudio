@@ -85,6 +85,7 @@ Editorial rules:
 - Add 2-4 specific hashtags that fit the article topic and the platform audience. Do not use generic tags such as #ResearchCommunication or #EvidenceInPractice. Do not repeat the same tags across platforms unless they genuinely fit each one.
 - Put hashtags only in the hashtags array, not in the post content.
 - Do not use em dashes, en dashes, or double hyphens in the post content. Use commas, periods, or colons instead.
+- Do not use emojis.
 - Include the source URL in the copy when provided: ${context.sourceUrl || "No source URL provided"}.
 - Keep each post specific to its platform and within its character limit after hashtags are included.
 - Return only valid JSON in the shape {"drafts":[{"platform":"linkedin","content":"...","hashtags":["#Example"],"characterCount":0,"characterLimit":3000}]}.
@@ -141,13 +142,14 @@ function parseDrafts(
             const normalized = tag.trim().startsWith("#")
               ? tag.trim()
               : `#${tag.trim().replace(/^#+/, "")}`;
-            return normalized;
+            return normalized.replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u200D\u20E3]/gu, "");
           })
           .filter((tag, index, all) => !excludedHashtags.has(tag.toLowerCase()) && all.indexOf(tag) === index)
           .slice(0, 4)
       : [];
     let content = item.content
       .trim()
+      .replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\p{Emoji_Modifier}\uFE0E\uFE0F\u200D\u20E3]/gu, "")
       .replace(/\s*--+\s*/g, ", ")
       .replace(/\s*[\u2012-\u2015]\s*/g, ", ")
       .replace(/,\s*,+/g, ",")

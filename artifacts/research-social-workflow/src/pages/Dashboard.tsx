@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { LoaderCircle, PenLine, Sparkles } from "lucide-react";
+import { LoaderCircle, PenLine } from "lucide-react";
 import {
   getListCampaignsQueryKey,
   getListSourcesQueryKey,
@@ -224,7 +224,7 @@ function Dashboard() {
         <header className="simple-tool-header">
           <div className="brand-mark" aria-hidden="true"><PenLine size={17} /></div>
           <div>
-            <h1>Economic Studies Group Social Media Posts</h1>
+            <h1>ESG Social Studio</h1>
           </div>
         </header>
 
@@ -310,7 +310,7 @@ function Dashboard() {
                 disabled={isGenerating || selectedPlatforms.length === 0 || (inputMode === "paste" && sourceContent.trim().length < 20) || (inputMode === "link" && !articleUrl.trim())}
                 data-testid="button-generate-campaign"
               >
-                {isGenerating ? <LoaderCircle size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                {isGenerating && <LoaderCircle size={14} className="animate-spin" />}
                 {isGenerating ? "Generating…" : "Generate posts"}
               </button>
             </div>
@@ -329,10 +329,7 @@ function Dashboard() {
         </div>
 
         <details className="saved-content-disclosure">
-          <summary>
-            Library and past posts
-            <span>{sources.length} articles · {pastCampaigns.length} posts</span>
-          </summary>
+          <summary>Library and past posts</summary>
           <div className="history-grid">
             <SourcePanel
               sources={sources}
