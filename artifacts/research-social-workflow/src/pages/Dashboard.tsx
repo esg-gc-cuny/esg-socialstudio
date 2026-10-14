@@ -55,7 +55,8 @@ function Dashboard() {
   const campaigns = [...(campaignsQuery.data ?? [])].sort(
     (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
   );
-  const latestCampaign = campaigns.find((campaign) => campaign.id === activeCampaignId);
+  const latestCampaign =
+    campaigns.find((campaign) => campaign.id === activeCampaignId) ?? campaigns[0];
   const pastCampaigns = latestCampaign
     ? campaigns.filter((campaign) => campaign.id !== latestCampaign.id)
     : campaigns;

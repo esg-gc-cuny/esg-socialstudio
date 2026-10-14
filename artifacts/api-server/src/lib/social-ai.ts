@@ -57,6 +57,10 @@ const platformNames: Record<PlatformId, string> = {
 const forbiddenPerspectivePattern =
   /\b(?:i|me|my|mine|myself|we|us|our|ours|ourselves|you|your|yours|yourself|yourselves)\b|\b(?:i|we|you)[’'](?:m|ve|ll|d|re)\b/i;
 
+function containsNonThirdPersonText(text: string): boolean {
+  return forbiddenPerspectivePattern.test(text.replace(/https?:\/\/\S+/gi, ""));
+}
+
 function getAnthropicClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -66,11 +70,140 @@ function getAnthropicClient(): Anthropic {
 }
 
 function hasNonThirdPersonDraft(drafts: PlatformDraft[]): boolean {
-  return drafts.some((draft) =>
-    forbiddenPerspectivePattern.test(
-      draft.content.replace(/https?:\/\/\S+/gi, ""),
-    ),
-  );
+  return drafts.some((draft) => containsNonThirdPersonText(draft.content));
+}
+
+function removeNonThirdPersonSentences(content: string): string {
+  return content
+    .split(/(?<=[.!?])\s+|[\r\n]+/u)
+    .filter((sentence) => !containsNonThirdPersonText(sentence))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function enforceThirdPerson(
+  drafts: PlatformDraft[],
+  context: GenerationContext,
+): PlatformDraft[] {
+  const safeInvitation =
+    "The Economic Studies Group welcomes discussion of these findings.";
+
+  return drafts.map((draft) => {
+    let content = removeNonThirdPersonSentences(draft.content);
+    if (!content) {
+      content = "The Economic Studies Group shares new research.";
+    }
+    if (context.sourceUrl && !content.includes(context.sourceUrl)) {
+      content += `\n\nThe full article is available at ${context.sourceUrl}`;
+    }
+    if (!/\b(?:read|discussion|discuss|conversation|comments?|respond|response)\b/i.test(content)) {
+      content += `\n\n${safeInvitation}`;
+    }
+
+    const hashtagLength = draft.hashtags.length
+      ? draft.hashtags.join(" ").length + 1
+      : 0;
+    const contentLimit = Math.max(0, draft.characterLimit - hashtagLength);
+    if (content.length > contentLimit) {
+      const linkLine = context.sourceUrl
+        ? `Full article: ${context.sourceUrl}`
+        : "";
+      const invitation = "The Group welcomes discussion.";
+      const suffix = [linkLine, invitation].filter(Boolean).join("\n\n");
+      const safeBody = context.sourceUrl
+        ? content.replace(context.sourceUrl, "").trim()
+        : content;
+      const bodyLimit = Math.max(0, contentLimit - suffix.length - 2);
+      const body = safeBody
+        .slice(0, bodyLimit)
+        .replace(/\s+\S*$/, "")
+        .trim();
+      content = [body, suffix].filter(Boolean).join("\n\n");
+    }
+
+    return {
+      ...draft,
+      content,
+      characterCount:
+        content.length +
+        (draft.hashtags.length ? draft.hashtags.join(" ").length + 1 : 0),
+    };
+  });
+}
+
+const shortPostTargets: Record<PlatformId, number> = {
+  linkedin: 450,
+  facebook: 300,
+  bluesky: 260,
+  substack: 450,
+  x: 260,
+  instagram: 300,
+};
+
+const platformInvitations: Record<PlatformId, string> = {
+  linkedin: "The Group welcomes discussion.",
+  facebook: "The Group welcomes comments.",
+  bluesky: "The Group welcomes discussion.",
+  substack: "The Group welcomes reader responses.",
+  x: "The Group welcomes discussion.",
+  instagram: "The Group welcomes comments.",
+};
+
+function truncateAtWord(text: string, maxLength: number): string {
+  if (maxLength <= 0) return "";
+  if (text.length <= maxLength) return text;
+  if (maxLength <= 3) return text.slice(0, maxLength);
+  return `${text
+    .slice(0, maxLength - 1)
+    .replace(/\s+\S*$/, "")
+    .trim()}…`;
+}
+
+function makeBriefTeasers(
+  drafts: PlatformDraft[],
+  context: GenerationContext,
+): PlatformDraft[] {
+  return drafts.map((draft) => {
+    const platform = draft.platform as PlatformId;
+    const maxSentences =
+      platform === "linkedin" || platform === "substack" ? 2 : 1;
+    const hook = removeNonThirdPersonSentences(draft.content)
+      .split(/(?<=[.!?])\s+|[\r\n]+/u)
+      .filter(Boolean)
+      .filter((sentence) => !/\b(?:read|discussion|discuss|conversation|comments?|respond|response)\b/i.test(sentence))
+      .filter((sentence) => !context.sourceUrl || !sentence.includes(context.sourceUrl))
+      .slice(0, maxSentences)
+      .join(" ");
+    const hashtagsLength = draft.hashtags.length
+      ? draft.hashtags.join(" ").length + 1
+      : 0;
+    const contentLimit = Math.max(
+      0,
+      shortPostTargets[platform] - hashtagsLength,
+    );
+    const linkLine = context.sourceUrl
+      ? `Full article: ${context.sourceUrl}`
+      : "";
+    const invitation = platformInvitations[platform];
+    const fixedLines = [linkLine, invitation].filter(Boolean);
+    const fixedLength =
+      fixedLines.join("\n\n").length +
+      (fixedLines.length && hook ? 2 : 0);
+    const body = truncateAtWord(
+      hook || "The Economic Studies Group explores a timely economic question.",
+      Math.max(0, contentLimit - fixedLength),
+    );
+    const content = [body, ...fixedLines].filter(Boolean).join("\n\n");
+
+    return {
+      ...draft,
+      content,
+      characterCount:
+        content.length +
+        (draft.hashtags.length ? draft.hashtags.join(" ").length + 1 : 0),
+    };
+  });
 }
 
 function buildPrompt(context: GenerationContext): string {
@@ -80,13 +213,13 @@ function buildPrompt(context: GenerationContext): string {
       const limit = characterLimits[platform];
       const style =
         platform === "substack"
-          ? "Write a polished newsletter note that builds curiosity, gives useful context, links to the article, and invites a thoughtful response."
+          ? "Write a short newsletter teaser of 2-3 sentences, about 200-450 characters including hashtags when possible. Use one hook, at most one supporting detail, the article link, and a brief invitation in the Group's publisher voice. Do not summarize the whole article."
           : platform === "bluesky" || platform === "x"
-            ? "Write one concise, self-contained post with a clear insight, the article link, and a brief invitation to discuss the issue. Stay within the character limit including hashtags."
+            ? "Write one very concise post, about 170-260 characters including hashtags and link when possible. Use one hook, the article link, and a brief third-person invitation. Do not summarize the whole article."
             : platform === "linkedin"
-              ? "Write a natural professional post. Lead with a specific insight, explain why it matters, link to the full article, and close with an open question for professional discussion."
+              ? "Write a natural, short professional teaser of 2-3 sentences, about 200-450 characters including hashtags when possible. Use one specific hook, one reason it matters, the article link, and a brief subject-focused question or third-person invitation from the Group. Do not summarize the whole article."
               : platform === "facebook"
-                ? "Write an approachable post. Connect the finding to why followers may care, include the article link, and invite comments with a relevant question."
+                ? "Write an approachable teaser of 1-2 short sentences, about 150-300 characters including hashtags when possible. Use one hook, the article link, and a short topic-focused question or third-person invitation from the Group. Do not summarize the whole article."
               : platform === "instagram"
                 ? "Use a short, accessible caption with a strong first line and a clear next step."
                 : "Write a warm, accessible post with a plain-language takeaway, the article link, and a relevant invitation to discuss.";
@@ -98,13 +231,14 @@ function buildPrompt(context: GenerationContext): string {
 
 Editorial rules:
 - Use only claims supported by the source. Never invent study results, statistics, quotes, authors, or implications.
-- Preserve uncertainty, limitations, and non-causal language. Do not overstate evidence or promise outcomes.
+- Preserve uncertainty, limitations, and non-causal language when needed to avoid misleading readers. Do not overstate evidence or promise outcomes.
+- Write a short promotional teaser, not an article summary or abstract. Use one attention-grabbing hook and at most one supporting detail. Omit methods, extra findings, and background that the full article can explain.
 - Write from the Economic Studies Group's publisher perspective, but use third person only. Refer to it as "the Economic Studies Group" or "the Group" when attribution is useful. Do not sound like a detached outside observer.
 - Never use first-person or second-person pronouns or contractions. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves. Do not quote first-person source language. Rephrase it in third person.
-- Invite readers to open the original article and engage with its topic. Use a platform-appropriate question or neutral call to action. Prefer imperatives such as "Read the full article" and questions about the issue. Do not use direct address such as "What do you think?"
+- Invite readers to open the original article and engage with its topic. Use a platform-appropriate, third-person invitation in the Group's publisher voice, such as "The full article is available at [URL]" and "The Group welcomes discussion of [topic]." Questions must focus on the issue, never address the reader.
 - Keep the voice ${context.tone}. Write for ${context.audience || "an interested general audience"}.
 - Campaign goal: ${context.campaignGoal || "raise awareness and invite readers to the full research resource"}.
-- Sound like a human social media manager promoting work published by the Group, not an ad template or a detached summary. Lead with a specific, accurate reason to care, then invite readers to the source and a substantive discussion. Avoid canned hooks, exaggerated claims, and repeated calls to action.
+- Sound like a human social media manager promoting work published by the Group, not an ad template or a detached summary. Lead with a specific, accurate reason to care, then invite readers to the source and a brief discussion. Avoid canned hooks, exaggerated claims, detailed summaries, and repeated calls to action.
 - Use plain language and platform-appropriate formatting.
 - Add 2-4 specific hashtags that fit the article topic and the platform audience. Do not use generic tags such as #ResearchCommunication or #EvidenceInPractice. Do not repeat the same tags across platforms unless they genuinely fit each one.
 - Put hashtags only in the hashtags array, not in the post content.
@@ -112,7 +246,8 @@ Editorial rules:
 - Do not use emojis.
 - Include the source URL in the copy when provided: ${context.sourceUrl || "No source URL provided"}.
 - Keep each post specific to its platform and within its character limit after hashtags are included.
-- Before returning, check every post for first-person and second-person wording. Rewrite any violation in third person and preserve a clear invitation to read and engage.
+- Keep posts brief enough to make readers curious, not fully informed. The article should contain the detail and analysis.
+- Before returning, check every post for first-person and second-person wording. Rewrite any violation in third person. Do not use direct-address questions or imperatives.
 - Return only valid JSON in the shape {"drafts":[{"platform":"linkedin","content":"...","hashtags":["#Example"],"characterCount":0,"characterLimit":3000}]}.
 
 Source title: ${context.title}
@@ -130,8 +265,10 @@ function buildPerspectiveCorrectionPrompt(rawText: string): string {
 Rules:
 - The Economic Studies Group is the publisher. Refer to it as "the Economic Studies Group" or "the Group" when attribution is useful.
 - Remove all first-person and second-person pronouns and contractions. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves.
-- Keep the original claims, URLs, hashtags, platform formats, and article invitation. Do not add facts.
-- Keep the posts natural and inviting, with a platform-appropriate prompt to read the article and engage with its topic.
+- Keep supported claims, URLs, hashtags, and platform formats. Do not add facts.
+- Shorten each post to a teaser with one hook and no more than one supporting detail. Remove methods, extra findings, and article-summary language.
+- Replace any reader-directed question or imperative with a third-person invitation, such as "The Economic Studies Group welcomes discussion of [topic]." The article link can be introduced with "The full article is available at [URL]."
+- Keep the posts natural and inviting. Questions must focus on the research topic, not address the reader.
 - Return only valid JSON in the same shape as the input.
 
 Posts to revise:
@@ -238,6 +375,7 @@ export async function generatePlatformDrafts(
     const response = await anthropicClient.messages.create({
       model,
       max_tokens: 8192,
+      thinking: { type: "disabled" },
       messages: [{ role: "user", content: prompt }],
     });
     rawText = response.content
@@ -267,33 +405,39 @@ export async function generatePlatformDrafts(
 
   let drafts = parseDrafts(rawText, context.platforms);
   if (hasNonThirdPersonDraft(drafts)) {
-    if (!anthropicClient) {
-      throw new Error("Generated posts must use third-person language. Please try again.");
+    if (anthropicClient) {
+      try {
+        const correction = await anthropicClient.messages.create({
+          model,
+          max_tokens: 8192,
+          thinking: { type: "disabled" },
+          messages: [
+            {
+              role: "user",
+              content: buildPerspectiveCorrectionPrompt(rawText),
+            },
+          ],
+        });
+        const correctedText = correction.content
+          .filter((block) => block.type === "text")
+          .map((block) => block.text)
+          .join("");
+        inputTokens += correction.usage.input_tokens;
+        outputTokens += correction.usage.output_tokens;
+        if (correctedText) {
+          drafts = parseDrafts(correctedText, context.platforms);
+        }
+      } catch {
+        // Preserve the original drafts and apply deterministic cleanup below.
+      }
     }
-
-    const correction = await anthropicClient.messages.create({
-      model,
-      max_tokens: 8192,
-      messages: [
-        {
-          role: "user",
-          content: buildPerspectiveCorrectionPrompt(rawText),
-        },
-      ],
-    });
-    const correctedText = correction.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text)
-      .join("");
-    if (!correctedText) {
-      throw new Error("Claude could not revise the posts into third person. Please try again.");
-    }
-    inputTokens += correction.usage.input_tokens;
-    outputTokens += correction.usage.output_tokens;
-    drafts = parseDrafts(correctedText, context.platforms);
-    if (hasNonThirdPersonDraft(drafts)) {
-      throw new Error("Claude returned first-person or second-person wording after revision. Please try again.");
-    }
+  }
+  if (hasNonThirdPersonDraft(drafts)) {
+    drafts = enforceThirdPerson(drafts, context);
+  }
+  drafts = makeBriefTeasers(drafts, context);
+  if (hasNonThirdPersonDraft(drafts)) {
+    throw new Error("Generated posts could not be kept in third-person language.");
   }
 
   return {
