@@ -1,4 +1,4 @@
-import { anthropic } from "@workspace/integrations-anthropic-ai";
+import Anthropic from "@anthropic-ai/sdk";
 import { ai } from "@workspace/integrations-gemini-ai";
 import { openai } from "@workspace/integrations-openai-ai-server";
 import type { PlatformDraft } from "@workspace/db";
@@ -54,6 +54,25 @@ const platformNames: Record<PlatformId, string> = {
   instagram: "Instagram",
 };
 
+const forbiddenPerspectivePattern =
+  /\b(?:i|me|my|mine|myself|we|us|our|ours|ourselves|you|your|yours|yourself|yourselves)\b|\b(?:i|we|you)[’'](?:m|ve|ll|d|re)\b/i;
+
+function getAnthropicClient(): Anthropic {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("Anthropic API key is missing. Add ANTHROPIC_API_KEY in Replit Secrets.");
+  }
+  return new Anthropic({ apiKey });
+}
+
+function hasNonThirdPersonDraft(drafts: PlatformDraft[]): boolean {
+  return drafts.some((draft) =>
+    forbiddenPerspectivePattern.test(
+      draft.content.replace(/https?:\/\/\S+/gi, ""),
+    ),
+  );
+}
+
 function buildPrompt(context: GenerationContext): string {
   const platformInstructions = context.platforms
     .map((platform) => {
@@ -61,26 +80,31 @@ function buildPrompt(context: GenerationContext): string {
       const limit = characterLimits[platform];
       const style =
         platform === "substack"
-          ? "Write a conversational newsletter teaser with a clear opening, a useful detail, and an invitation to read the full work."
+          ? "Write a polished newsletter note that builds curiosity, gives useful context, links to the article, and invites a thoughtful response."
           : platform === "bluesky" || platform === "x"
-            ? "Write one concise, self-contained post that sounds like a thoughtful person sharing useful work. Stay within the character limit including hashtags."
+            ? "Write one concise, self-contained post with a clear insight, the article link, and a brief invitation to discuss the issue. Stay within the character limit including hashtags."
             : platform === "linkedin"
-              ? "Write a natural professional post. Lead with a specific insight, explain why it matters, and invite readers to the full article."
+              ? "Write a natural professional post. Lead with a specific insight, explain why it matters, link to the full article, and close with an open question for professional discussion."
+              : platform === "facebook"
+                ? "Write an approachable post. Connect the finding to why followers may care, include the article link, and invite comments with a relevant question."
               : platform === "instagram"
                 ? "Use a short, accessible caption with a strong first line and a clear next step."
-                : "Write a warm, accessible post with a plain-language takeaway and a relevant invitation to read.";
+                : "Write a warm, accessible post with a plain-language takeaway, the article link, and a relevant invitation to discuss.";
       return `- ${name} (${platform}, maximum ${limit} characters): ${style}`;
     })
     .join("\n");
 
-  return `You adapt research-group articles and primers into accurate public-facing promotional copy.
+  return `You are the Economic Studies Group's social media manager. Adapt the Group's published research articles and primers into accurate public-facing posts that encourage followers to read and discuss the original work.
 
 Editorial rules:
 - Use only claims supported by the source. Never invent study results, statistics, quotes, authors, or implications.
 - Preserve uncertainty, limitations, and non-causal language. Do not overstate evidence or promise outcomes.
+- Write from the Economic Studies Group's publisher perspective, but use third person only. Refer to it as "the Economic Studies Group" or "the Group" when attribution is useful. Do not sound like a detached outside observer.
+- Never use first-person or second-person pronouns or contractions. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves. Do not quote first-person source language. Rephrase it in third person.
+- Invite readers to open the original article and engage with its topic. Use a platform-appropriate question or neutral call to action. Prefer imperatives such as "Read the full article" and questions about the issue. Do not use direct address such as "What do you think?"
 - Keep the voice ${context.tone}. Write for ${context.audience || "an interested general audience"}.
 - Campaign goal: ${context.campaignGoal || "raise awareness and invite readers to the full research resource"}.
-- Sound like a real person sharing useful work, not an ad template. Avoid canned hooks, exaggerated claims, and repeated calls to action.
+- Sound like a human social media manager promoting work published by the Group, not an ad template or a detached summary. Lead with a specific, accurate reason to care, then invite readers to the source and a substantive discussion. Avoid canned hooks, exaggerated claims, and repeated calls to action.
 - Use plain language and platform-appropriate formatting.
 - Add 2-4 specific hashtags that fit the article topic and the platform audience. Do not use generic tags such as #ResearchCommunication or #EvidenceInPractice. Do not repeat the same tags across platforms unless they genuinely fit each one.
 - Put hashtags only in the hashtags array, not in the post content.
@@ -88,6 +112,7 @@ Editorial rules:
 - Do not use emojis.
 - Include the source URL in the copy when provided: ${context.sourceUrl || "No source URL provided"}.
 - Keep each post specific to its platform and within its character limit after hashtags are included.
+- Before returning, check every post for first-person and second-person wording. Rewrite any violation in third person and preserve a clear invitation to read and engage.
 - Return only valid JSON in the shape {"drafts":[{"platform":"linkedin","content":"...","hashtags":["#Example"],"characterCount":0,"characterLimit":3000}]}.
 
 Source title: ${context.title}
@@ -97,6 +122,20 @@ ${context.content}
 
 Create one draft for each requested platform:
 ${platformInstructions}`;
+}
+
+function buildPerspectiveCorrectionPrompt(rawText: string): string {
+  return `Rewrite the following JSON social posts so every post uses third person only.
+
+Rules:
+- The Economic Studies Group is the publisher. Refer to it as "the Economic Studies Group" or "the Group" when attribution is useful.
+- Remove all first-person and second-person pronouns and contractions. Do not use I, me, my, mine, myself, we, us, our, ours, ourselves, you, your, yours, yourself, or yourselves.
+- Keep the original claims, URLs, hashtags, platform formats, and article invitation. Do not add facts.
+- Keep the posts natural and inviting, with a platform-appropriate prompt to read the article and engage with its topic.
+- Return only valid JSON in the same shape as the input.
+
+Posts to revise:
+${rawText}`;
 }
 
 function extractJson(text: string): unknown {
@@ -182,6 +221,7 @@ export async function generatePlatformDrafts(
   let rawText = "";
   let inputTokens = Math.ceil(prompt.length / 4);
   let outputTokens = 0;
+  let anthropicClient: Anthropic | undefined;
 
   if (context.provider === "openai") {
     const response = await openai.chat.completions.create({
@@ -194,7 +234,8 @@ export async function generatePlatformDrafts(
     inputTokens = response.usage?.prompt_tokens ?? inputTokens;
     outputTokens = response.usage?.completion_tokens ?? Math.ceil(rawText.length / 4);
   } else if (context.provider === "anthropic") {
-    const response = await anthropic.messages.create({
+    anthropicClient = getAnthropicClient();
+    const response = await anthropicClient.messages.create({
       model,
       max_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
@@ -224,9 +265,40 @@ export async function generatePlatformDrafts(
     throw new Error("The selected AI provider returned an empty response.");
   }
 
+  let drafts = parseDrafts(rawText, context.platforms);
+  if (hasNonThirdPersonDraft(drafts)) {
+    if (!anthropicClient) {
+      throw new Error("Generated posts must use third-person language. Please try again.");
+    }
+
+    const correction = await anthropicClient.messages.create({
+      model,
+      max_tokens: 8192,
+      messages: [
+        {
+          role: "user",
+          content: buildPerspectiveCorrectionPrompt(rawText),
+        },
+      ],
+    });
+    const correctedText = correction.content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text)
+      .join("");
+    if (!correctedText) {
+      throw new Error("Claude could not revise the posts into third person. Please try again.");
+    }
+    inputTokens += correction.usage.input_tokens;
+    outputTokens += correction.usage.output_tokens;
+    drafts = parseDrafts(correctedText, context.platforms);
+    if (hasNonThirdPersonDraft(drafts)) {
+      throw new Error("Claude returned first-person or second-person wording after revision. Please try again.");
+    }
+  }
+
   return {
     model,
-    drafts: parseDrafts(rawText, context.platforms),
+    drafts,
     inputTokens,
     outputTokens,
   };

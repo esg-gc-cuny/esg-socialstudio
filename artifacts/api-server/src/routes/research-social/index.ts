@@ -65,11 +65,11 @@ const providers = [
     id: "anthropic",
     name: "Claude",
     model: providerModels.anthropic,
-    apiAccess: "Managed Replit AI Integration; no separate provider key required.",
+    apiAccess: "Direct Anthropic API using ANTHROPIC_API_KEY from Replit Secrets.",
     inputUsdPerMillion: providerCosts.anthropic.input,
     outputUsdPerMillion: providerCosts.anthropic.output,
     pricingUrl: "https://docs.anthropic.com/en/docs/about-claude/pricing",
-    note: "Rates shown are the current direct API reference. This app's managed calls are billed in Replit credits, not at these direct API rates.",
+    note: "Direct API charges are billed by Anthropic. Estimates use Haiku 5.5 rates for prompts up to 100,000 tokens.",
   },
   {
     id: "gemini",
