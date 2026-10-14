@@ -1098,7 +1098,11 @@ The article below is the only factual source. Do not use outside knowledge, assu
 
 Review and improve each proposed draft. Remove or rewrite any statement that is not directly supported by the article, including numbers, dates, named people or places, comparisons, causes, forecasts, and implications. Questions may invite curiosity, but their premises must be supported. Do not add details to make a post sound more complete. Keep the result concise, coherent, human, and inviting, with enough article-specific context to earn a click. Preserve third-person publisher voice; do not use first- or second-person pronouns, emojis, em dashes, en dashes, or double hyphens.
 
+When attributing an explanation or argument, use the exact author name from the article's verified byline instead of “the article says,” “the article states,” or similar article-as-speaker wording. Choose an accurate verb such as examines, explains, argues, suggests, or finds according to what the source actually does; never strengthen tentative language into a proven conclusion. If no clear byline is present, state the supported point directly without attribution. Keep attribution natural and brief, not in every sentence.
+
 Return the final copy as a sentences array with one complete sentence per object. Pair each sentence with one exact, contiguous excerpt from the article in its evidence field. Evidence is internal validation only and must not appear in post text. Return hashtags as objects paired with one exact article excerpt supporting each tag. Use only article-named people, places, institutions, industries, or topics. Remove tags that rely on inferred or outside context. ${context.generateHashtags ? "Generate multiple relevant tags where they fit, without padding to a fixed count." : "Return no hashtags."}
+
+${context.generateHashtags ? "For discovery, mix recognizable subject hashtags with specific article-grounded location, industry, or policy tags. Aim for 3–5 on LinkedIn and Substack, 1–3 on Facebook, and 1–2 on Bluesky only where space permits. Prefer standard readable topic names and common abbreviations over invented compound tags; standard hashtag wording may differ from the article's literal words, but its topic must be explicitly discussed and supported by the paired excerpt. Rank the most useful tags first so they survive length limits. Avoid near-duplicate tags, generic campaign slogans, unrelated popular tags, and unsupported claims about trending status or reach. Keep fewer tags when the article or space does not justify more." : "Do not add hashtags even if the proposed drafts contain them."}
 
 Use one draft for each requested platform, in the same order as the proposed drafts. Follow the platform character limits below. The application adds the fixed final line “Read the full article on our website: ${context.sourceUrl ?? "[source URL unavailable]"}” after hashtags. Include that line in your character-limit calculation, but do not return it in content. Prioritize complete, supported context and the final link over hashtags. Do not cut a sentence mid-sentence.
 
@@ -1177,6 +1181,9 @@ function parseGroundedDrafts(
       throw new Error(`${platform} review returned no complete sentence with exact article support.`);
     }
     const content = normalizeContent(supportedSentences.join(" "));
+    if (/\b(?:the|this|our)(?:\s+(?:new|latest|newly published))?\s+article\s+(?:says|states|explains|argues|suggests|finds|shows|notes|reports|examines|discusses|highlights)\b/i.test(content)) {
+      throw new Error(`${platform} reviewed content must attribute statements to verified authors, not the article, or state the point directly.`);
+    }
     if (hasNonThirdPersonText(content)) {
       throw new Error(`${platform} reviewed content uses first- or second-person wording.`);
     }
@@ -1195,11 +1202,10 @@ function parseGroundedDrafts(
       : [];
     let hashtags = normalizeHashtags(
       platform,
-      rawHashtagPairs.map((pair) => pair.tag),
+      rawHashtagPairs
+        .filter((pair) => sourceContainsExcerpt(articleSource, pair.evidence))
+        .map((pair) => pair.tag),
       context.generateHashtags,
-    );
-    hashtags = hashtags.filter((_, tagIndex) =>
-      sourceContainsExcerpt(articleSource, rawHashtagPairs[tagIndex]?.evidence ?? ""),
     );
 
     const rules = platformRules[platform];

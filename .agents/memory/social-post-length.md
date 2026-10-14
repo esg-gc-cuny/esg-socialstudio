@@ -7,6 +7,12 @@ Never fit a social teaser by cutting in the middle of a sentence. Prefer complet
 
 Start with a topic-specific teaser, not a generic announcement. Write in the publisher's third-person voice and integrate a verified author naturally when it strengthens the post, but do not force a fixed opening or byline. “Our” is allowed in natural publisher phrasing and the final CTA; avoid first-person singular, emojis, dash punctuation, and unsupported audience claims. Give enough context to create curiosity without summarizing the full article.
 
+For attribution, use the verified author's name with an accurate verb instead of “the article states/says.” Preserve the source's level of certainty; if there is no verified author, state the supported point directly.
+
+**Why:** The user requested author-led attribution rather than treating the article as the speaker.
+
+**How to apply:** Use verbs such as explains, examines, argues, or suggests only when accurate to the source. Do not force attribution into every sentence or invent a byline.
+
 Join the hook and article invitation into one coherent paragraph; keep optional platform-appropriate hashtags and the final article CTA in the same copyable post. When a source URL is available, put hashtags before the final line: “Read the full article on our website: [URL].”
 
 **Why:** Character targets, especially posts with a long article URL, can otherwise leave a dangling phrase that reads like an error.
@@ -18,3 +24,9 @@ For ESG Social Studio, use one selected, platform-specific teaser per platform. 
 **Why:** The user approved a simple one-draft-per-platform workflow and emphasized human, publisher-voice teasers that hook readers without giving away the full article. They also noted that Bluesky and Substack drafts need more context, and requested an on/off option for hashtags.
 
 **How to apply:** Keep article analysis and alternate drafts out of the current UI unless requested. Preserve the full article-link line in the post and copy action. Hashtags are enabled by default but user-controllable; when enabled, add distinct article-specific tags up to platform limits, dropping tags before context or the final link. With the toggle off, return none. Prioritize a named subject plus concrete detail on Bluesky and Substack.
+
+Use a mix of recognizable subject hashtags and specific article-grounded tags where appropriate, rather than obscure compounds or generic promotional slogans.
+
+**Why:** The user requested more relevant hashtags to support discovery and reach where apt, while keeping all information grounded in the article.
+
+**How to apply:** Prefer standard topic names and useful location, industry, or policy tags explicitly supported by the source. Do not pad counts, add unrelated popular tags, or promise increased reach.
