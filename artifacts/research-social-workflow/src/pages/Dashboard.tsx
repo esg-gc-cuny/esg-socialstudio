@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { LoaderCircle, PenLine } from "lucide-react";
+import { LoaderCircle } from "lucide-react";
 import {
   getListCampaignsQueryKey,
   getListSourcesQueryKey,
@@ -222,9 +222,13 @@ function Dashboard() {
     <div className="simple-tool-shell">
       <main className="simple-tool-main">
         <header className="simple-tool-header">
-          <div className="brand-mark" aria-hidden="true"><PenLine size={17} /></div>
           <div>
             <h1>ESG Social Studio</h1>
+            <ol className="workflow-instructions" aria-label="How to create social drafts">
+              <li>Add article text or a public link</li>
+              <li>Choose platforms</li>
+              <li>Review and copy the drafts</li>
+            </ol>
           </div>
         </header>
 

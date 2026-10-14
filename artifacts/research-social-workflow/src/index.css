@@ -2288,6 +2288,37 @@ a {
   font: 13px/1.5 var(--app-font-sans);
 }
 
+.simple-tool-shell .workflow-instructions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin: 15px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: workflow;
+}
+
+.simple-tool-shell .workflow-instructions li {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px;
+  border-left: 2px solid hsl(36 56% 48% / .7);
+  background: hsl(38 24% 90% / .58);
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  line-height: 1.35;
+  counter-increment: workflow;
+}
+
+.simple-tool-shell .workflow-instructions li::before {
+  content: counter(workflow, decimal-leading-zero);
+  flex: 0 0 auto;
+  color: hsl(var(--primary));
+  font: 500 12px var(--app-font-mono);
+}
+
 @media (max-width: 640px) {
   .simple-tool-shell .simple-tool-main {
     padding: 28px 16px 42px;
@@ -2311,6 +2342,17 @@ a {
 
   .simple-tool-shell .simple-tool-header p {
     font-size: 15px;
+  }
+
+  .simple-tool-shell .workflow-instructions {
+    grid-template-columns: 1fr;
+    gap: 5px;
+    margin-top: 12px;
+  }
+
+  .simple-tool-shell .workflow-instructions li {
+    padding: 7px 9px;
+    font-size: 14px;
   }
 
   .simple-tool-shell .simple-generator .panel-header,
