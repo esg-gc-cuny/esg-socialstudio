@@ -61,14 +61,14 @@ function buildPrompt(context: GenerationContext): string {
       const limit = characterLimits[platform];
       const style =
         platform === "substack"
-          ? "Write a useful newsletter-style introduction with a clear subject-like opening and an invitation to read or discuss the full work."
+          ? "Write a conversational newsletter teaser with a clear opening, a useful detail, and an invitation to read the full work."
           : platform === "bluesky" || platform === "x"
-            ? "Write one concise, self-contained post. Stay within the character limit including hashtags."
+            ? "Write one concise, self-contained post that sounds like a thoughtful person sharing useful work. Stay within the character limit including hashtags."
             : platform === "linkedin"
-              ? "Lead with a research insight, explain why it matters to practitioners or the public, and end with a grounded question or call to action."
+              ? "Write a natural professional post. Lead with a specific insight, explain why it matters, and invite readers to the full article."
               : platform === "instagram"
                 ? "Use a short, accessible caption with a strong first line and a clear next step."
-                : "Use a clear, accessible post with a plain-language research takeaway and a relevant next step.";
+                : "Write a warm, accessible post with a plain-language takeaway and a relevant invitation to read.";
       return `- ${name} (${platform}, maximum ${limit} characters): ${style}`;
     })
     .join("\n");
@@ -80,8 +80,11 @@ Editorial rules:
 - Preserve uncertainty, limitations, and non-causal language. Do not overstate evidence or promise outcomes.
 - Keep the voice ${context.tone}. Write for ${context.audience || "an interested general audience"}.
 - Campaign goal: ${context.campaignGoal || "raise awareness and invite readers to the full research resource"}.
-- Be engaging without sensationalism. Avoid jargon where plain language works.
-- Add 2-5 relevant hashtags per platform, formatted as #Hashtag.
+- Sound like a real person sharing useful work, not an ad template. Avoid canned hooks, exaggerated claims, and repeated calls to action.
+- Use plain language and platform-appropriate formatting.
+- Add 2-4 specific hashtags that fit the article topic and the platform audience. Do not use generic tags such as #ResearchCommunication or #EvidenceInPractice. Do not repeat the same tags across platforms unless they genuinely fit each one.
+- Put hashtags only in the hashtags array, not in the post content.
+- Do not use em dashes, en dashes, or double hyphens in the post content. Use commas, periods, or colons instead.
 - Include the source URL in the copy when provided: ${context.sourceUrl || "No source URL provided"}.
 - Keep each post specific to its platform and within its character limit after hashtags are included.
 - Return only valid JSON in the shape {"drafts":[{"platform":"linkedin","content":"...","hashtags":["#Example"],"characterCount":0,"characterLimit":3000}]}.
@@ -130,17 +133,33 @@ function parseDrafts(
     if (!item || typeof item.content !== "string" || !requested.has(platform)) {
       throw new Error(`The selected AI provider did not return a valid ${platformNames[platform]} draft.`);
     }
+    const excludedHashtags = new Set(["#researchcommunication", "#evidenceinpractice"]);
     const hashtags = Array.isArray(item.hashtags)
       ? item.hashtags
           .filter((tag): tag is string => typeof tag === "string")
-          .map((tag) => (tag.startsWith("#") ? tag : `#${tag.replace(/^#+/, "")}`))
-          .slice(0, 5)
+          .map((tag) => {
+            const normalized = tag.trim().startsWith("#")
+              ? tag.trim()
+              : `#${tag.trim().replace(/^#+/, "")}`;
+            return normalized;
+          })
+          .filter((tag, index, all) => !excludedHashtags.has(tag.toLowerCase()) && all.indexOf(tag) === index)
+          .slice(0, 4)
       : [];
-    let content = item.content.trim();
+    let content = item.content
+      .trim()
+      .replace(/\s*--+\s*/g, ", ")
+      .replace(/\s*[\u2012-\u2015]\s*/g, ", ")
+      .replace(/,\s*,+/g, ",")
+      .replace(/[ \t]{2,}/g, " ")
+      .replace(/[ \t]+\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/#ResearchCommunication\b|#EvidenceInPractice\b/gi, "")
+      .trim();
     for (const tag of hashtags) {
       content = content.split(tag).join("").trim();
     }
-    content = content.replace(/\s{2,}/g, " ").trim();
+    content = content.replace(/[ \t]{2,}/g, " ").replace(/[ \t]+\n/g, "\n").trim();
     const characterCount =
       content.length + (hashtags.length ? hashtags.join(" ").length + 1 : 0);
     return {

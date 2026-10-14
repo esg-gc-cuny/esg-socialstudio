@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, Clipboard, Clock3, MessageSquareText, Trash2 } from "lucide-react";
+import { Check, Clipboard } from "lucide-react";
 import type { Campaign, CampaignReviewUpdate, PlatformDraft } from "@workspace/api-client-react";
 
 type CampaignPanelProps = {
@@ -8,9 +8,33 @@ type CampaignPanelProps = {
   error: boolean;
   onRetry: () => void;
   onReview: (campaign: Campaign, update: CampaignReviewUpdate) => void;
-  onDelete: (campaign: Campaign) => void;
   savingId: number | null;
+  title?: string;
 };
+
+const providerNames: Record<string, string> = {
+  anthropic: "Claude",
+  openai: "OpenAI",
+  gemini: "Gemini",
+};
+
+const excludedHashtags = new Set(["#researchcommunication", "#evidenceinpractice"]);
+
+function cleanDraft(draft: PlatformDraft): PlatformDraft {
+  const hashtags = draft.hashtags.filter((tag) => !excludedHashtags.has(tag.toLowerCase()));
+  const content = draft.content
+    .replace(/\s*--+\s*/g, ", ")
+    .replace(/\s*[\u2012-\u2015]\s*/g, ", ")
+    .replace(/#ResearchCommunication\b|#EvidenceInPractice\b/gi, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+  return {
+    ...draft,
+    content,
+    hashtags,
+    characterCount: content.length + (hashtags.length ? hashtags.join(" ").length + 1 : 0),
+  };
+}
 
 const platformNames: Record<string, string> = {
   linkedin: "LinkedIn",
@@ -21,29 +45,18 @@ const platformNames: Record<string, string> = {
   instagram: "Instagram",
 };
 
-const statusNames: Record<string, string> = {
-  needs_review: "Needs review",
-  approved: "Approved",
-  changes_requested: "Changes requested",
-};
-
 function CampaignCard({
   campaign,
   onReview,
-  onDelete,
   saving,
 }: {
   campaign: Campaign;
   onReview: CampaignPanelProps["onReview"];
-  onDelete: CampaignPanelProps["onDelete"];
   saving: boolean;
 }) {
-  const [drafts, setDrafts] = useState<PlatformDraft[]>(campaign.outputs);
+  const [drafts, setDrafts] = useState<PlatformDraft[]>(() => campaign.outputs.map(cleanDraft));
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [copyErrorPlatform, setCopyErrorPlatform] = useState<string | null>(null);
-  const makeStatusUpdate = (status: Campaign["status"]) => {
-    onReview(campaign, { status, outputs: drafts });
-  };
   const copyDraft = async (draft: PlatformDraft) => {
     const text = [draft.content, draft.hashtags.join(" ")].filter(Boolean).join("\n\n");
     try {
@@ -67,36 +80,11 @@ function CampaignCard({
         }
       : draft));
   };
-  const deleteThisCampaign = () => {
-    if (window.confirm(`Delete drafts for “${campaign.sourceTitle}”? This cannot be undone.`)) {
-      onDelete(campaign);
-    }
-  };
-  const statusClass = campaign.status === "approved"
-    ? "status-badge status-approved"
-    : campaign.status === "changes_requested"
-      ? "status-badge status-changes"
-      : "status-badge";
-
   return (
     <article className="campaign-card" data-testid={`campaign-card-${campaign.id}`}>
       <div className="campaign-topline">
         <div className="campaign-source" data-testid={`campaign-source-${campaign.id}`}>{campaign.sourceTitle}</div>
-        <span className={statusClass} data-testid={`campaign-status-${campaign.id}`}>
-          {campaign.status === "approved" ? <Check size={10} /> : <Clock3 size={10} />}
-          {statusNames[campaign.status] ?? campaign.status}
-        </span>
-      </div>
-      <div className="campaign-meta">
-        <span>{campaign.provider}</span>
-        <span>·</span>
-        <span>{campaign.model}</span>
-        <span>·</span>
-        <span>{new Date(campaign.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</span>
-        <span>·</span>
-        <span title="Estimated direct-provider token-price equivalent; actual Replit AI Integration charges are billed in Replit credits.">
-          ~${Number(campaign.estimatedCostUsd).toFixed(4)} direct API ref.
-        </span>
+        <span className="campaign-provider-label">{providerNames[campaign.provider] ?? campaign.provider}</span>
       </div>
       <div className="draft-stack" aria-label="Platform drafts">
         {drafts.map((draft) => (
@@ -156,38 +144,7 @@ function CampaignCard({
             <Check size={12} />
             Save edits
           </button>
-          <button
-            className="button button-small button-quiet button-danger"
-            onClick={deleteThisCampaign}
-            data-testid={`button-delete-campaign-${campaign.id}`}
-          >
-            <Trash2 size={12} />
-            Delete
-          </button>
         </div>
-        <div className="campaign-actions-right">
-          <button
-            className="button button-small"
-            onClick={() => makeStatusUpdate("changes_requested")}
-            disabled={saving}
-            data-testid={`button-request-changes-${campaign.id}`}
-          >
-            <MessageSquareText size={12} />
-            Request changes
-          </button>
-          <button
-            className="button button-small button-primary"
-            onClick={() => makeStatusUpdate("approved")}
-            disabled={saving || campaign.status === "approved"}
-            data-testid={`button-approve-campaign-${campaign.id}`}
-          >
-            <Check size={12} />
-            {campaign.status === "approved" ? "Approved" : "Approve"}
-          </button>
-        </div>
-      </div>
-      <div className="campaign-footnote" style={{ marginTop: 9 }}>
-        Drafts only. Nothing is posted from this desk.
       </div>
     </article>
   );
@@ -199,17 +156,15 @@ export function CampaignPanel({
   error,
   onRetry,
   onReview,
-  onDelete,
   savingId,
+  title = "Posts",
 }: CampaignPanelProps) {
   return (
     <section className="panel content-section" id="campaigns" data-testid="section-campaigns">
       <div className="panel-header">
         <div>
-          <h2 className="panel-title">Campaign drafts</h2>
-          <div className="panel-subtitle">Copy any platform draft directly, then review the full set.</div>
+          <h2 className="panel-title">{title}</h2>
         </div>
-        <span className="eyebrow">{campaigns.length} total</span>
       </div>
       {isLoading ? (
         <div className="loading-state" data-testid="loading-campaigns">
@@ -218,7 +173,7 @@ export function CampaignPanel({
         </div>
       ) : error ? (
         <div className="error-state" data-testid="error-campaigns">
-          Campaign drafts could not be loaded.
+          Posts could not be loaded.
           <div style={{ marginTop: 10 }}>
             <button className="button button-small" onClick={onRetry} data-testid="button-retry-campaigns">
               Retry
@@ -227,11 +182,8 @@ export function CampaignPanel({
         </div>
       ) : campaigns.length === 0 ? (
         <div className="empty-state" data-testid="empty-campaigns">
-          <div className="empty-icon">
-            <MessageSquareText size={16} />
-          </div>
-          <strong>The review queue is clear</strong>
-          <div style={{ marginTop: 5 }}>Choose a source and generate your first set of platform drafts.</div>
+          <strong>{title === "Previous posts" ? "No previous posts" : "No posts yet"}</strong>
+          {title !== "Previous posts" && <div style={{ marginTop: 5 }}>Paste text or add a link above.</div>}
         </div>
       ) : (
         <div className="campaign-list">
@@ -240,7 +192,6 @@ export function CampaignPanel({
               key={campaign.id}
               campaign={campaign}
               onReview={onReview}
-              onDelete={onDelete}
               saving={savingId === campaign.id}
             />
           ))}

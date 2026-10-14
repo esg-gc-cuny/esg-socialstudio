@@ -32,6 +32,26 @@ export interface SourceInput {
   sourceUrl?: string;
 }
 
+export interface ArticleUrlInput {
+  /** @maxLength 2048 */
+  url: string;
+}
+
+export interface ExtractedArticle {
+  /**
+     * @minLength 1
+     * @maxLength 200
+     */
+  title: string;
+  /**
+     * @minLength 20
+     * @maxLength 100000
+     */
+  content: string;
+  /** @maxLength 2048 */
+  url: string;
+}
+
 export interface SourceUpdate {
   /**
      * @minLength 1

@@ -57,6 +57,30 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ContentSource"
+  /sources/extract:
+    post:
+      operationId: extractArticle
+      tags: [research-social]
+      summary: Extract article text from a public URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArticleUrlInput"
+      responses:
+        "200":
+          description: Extracted article content
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtractedArticle"
+        "400":
+          description: Invalid or unsafe URL
+        "422":
+          description: The page could not be read as an article
+        "502":
+          description: The remote page could not be reached or parsed
   /sources/{id}:
     patch:
       operationId: updateSource
@@ -226,6 +250,18 @@ components:
         title: { type: string, minLength: 1, maxLength: 200 }
         content: { type: string, minLength: 20, maxLength: 100000 }
         sourceUrl: { type: string, format: uri }
+    ArticleUrlInput:
+      type: object
+      required: [url]
+      properties:
+        url: { type: string, format: uri, maxLength: 2048 }
+    ExtractedArticle:
+      type: object
+      required: [title, content, url]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200 }
+        content: { type: string, minLength: 20, maxLength: 100000 }
+        url: { type: string, format: uri, maxLength: 2048 }
     SourceUpdate:
       type: object
       properties:

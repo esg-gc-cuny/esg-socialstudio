@@ -5,6 +5,8 @@ import {
   CreateSourceResponse,
   DeleteCampaignParams,
   DeleteSourceParams,
+  ExtractArticleBody,
+  ExtractArticleResponse,
   GenerateCampaignBody,
   GenerateCampaignResponse,
   GetDashboardResponse,
@@ -26,6 +28,10 @@ import {
   type PlatformDraft,
 } from "@workspace/db";
 import { generatePlatformDrafts, type ProviderId } from "../../lib/social-ai";
+import {
+  ArticleExtractionError,
+  extractPublicArticle,
+} from "../../lib/article-extractor";
 
 const router: IRouter = Router();
 
@@ -114,6 +120,28 @@ router.get("/sources", async (_req, res): Promise<void> => {
     .from(sourcesTable)
     .orderBy(desc(sourcesTable.createdAt));
   res.json(ListSourcesResponse.parse(sources));
+});
+
+router.post("/sources/extract", async (req, res): Promise<void> => {
+  const parsed = ExtractArticleBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+
+  try {
+    const article = await extractPublicArticle(parsed.data.url);
+    res.json(ExtractArticleResponse.parse(article));
+  } catch (error) {
+    if (error instanceof ArticleExtractionError) {
+      res.status(error.statusCode).json({ error: error.message });
+      return;
+    }
+    req.log.error({ err: error }, "Article link extraction failed");
+    res.status(502).json({
+      error: "Could not read that page. Paste the article text instead.",
+    });
+  }
 });
 
 router.post("/sources", async (req, res): Promise<void> => {

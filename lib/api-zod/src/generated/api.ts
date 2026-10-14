@@ -56,6 +56,33 @@ export const CreateSourceResponse = zod.object({
 
 
 /**
+ * @summary Extract article text from a public URL
+ */
+export const extractArticleBodyUrlMax = 2048;
+
+
+
+export const ExtractArticleBody = zod.object({
+  "url": zod.string().url().max(extractArticleBodyUrlMax)
+})
+
+export const extractArticleResponseTitleMax = 200;
+
+export const extractArticleResponseContentMin = 20;
+export const extractArticleResponseContentMax = 100000;
+
+export const extractArticleResponseUrlMax = 2048;
+
+
+
+export const ExtractArticleResponse = zod.object({
+  "title": zod.string().min(1).max(extractArticleResponseTitleMax),
+  "content": zod.string().min(extractArticleResponseContentMin).max(extractArticleResponseContentMax),
+  "url": zod.string().url().max(extractArticleResponseUrlMax)
+})
+
+
+/**
  * @summary Update a research source
  */
 export const UpdateSourceParams = zod.object({

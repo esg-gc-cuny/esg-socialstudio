@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './articleUrlInput';
 export * from './campaign';
 export * from './campaignGenerationInput';
 export * from './campaignGenerationInputPlatformsItem';
@@ -16,6 +17,7 @@ export * from './campaignReviewUpdateStatus';
 export * from './campaignStatus';
 export * from './contentSource';
 export * from './dashboardSummary';
+export * from './extractedArticle';
 export * from './healthStatus';
 export * from './platformDraft';
 export * from './providerInfo';
