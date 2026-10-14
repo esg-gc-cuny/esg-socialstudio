@@ -73,6 +73,22 @@ function getCopiedPostText(content: string, hashtags: string[]): string {
   ].filter(Boolean).join("\n\n");
 }
 
+function parsePostText(text: string): { content: string; hashtags: string[] } {
+  const { body, url } = splitArticleLink(text);
+  const hashtags = Array.from(body.matchAll(/(^|\s)(#[\p{L}\p{N}_-]+)/gu))
+    .map((match) => match[2])
+    .filter(Boolean);
+  const bodyWithoutHashtags = body
+    .replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, "$1")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  const cta = url ? `Read the full article on our website: ${url}` : "";
+  return {
+    content: [bodyWithoutHashtags, cta].filter(Boolean).join("\n\n"),
+    hashtags,
+  };
+}
+
 function CampaignCard({
   campaign,
   onReview,
@@ -86,12 +102,7 @@ function CampaignCard({
   const [copiedPlatform, setCopiedPlatform] = useState<string | null>(null);
   const [copyErrorPlatform, setCopyErrorPlatform] = useState<string | null>(null);
   const copyDraft = async (draft: PlatformDraft) => {
-    const { body, url } = splitArticleLink(draft.content);
-    const text = [
-      body,
-      draft.hashtags.join(" "),
-      url ? `Read the full article on our website: ${url}` : "",
-    ].filter(Boolean).join("\n\n");
+    const text = getCopiedPostText(draft.content, draft.hashtags);
     try {
       await navigator.clipboard.writeText(text);
       setCopiedPlatform(draft.platform);
@@ -104,12 +115,14 @@ function CampaignCard({
       window.setTimeout(() => setCopyErrorPlatform((current) => current === draft.platform ? null : current), 2500);
     }
   };
-  const updateDraft = (platform: string, content: string) => {
+  const updateDraft = (platform: string, postText: string) => {
+    const parsed = parsePostText(postText);
     setDrafts((current) => current.map((draft) => draft.platform === platform
       ? {
           ...draft,
-          content,
-          characterCount: getCopiedPostText(content, draft.hashtags).length,
+          content: parsed.content,
+          hashtags: parsed.hashtags,
+          characterCount: getCopiedPostText(parsed.content, parsed.hashtags).length,
         }
       : draft));
   };
@@ -121,7 +134,7 @@ function CampaignCard({
       </div>
       <div className="draft-stack" aria-label="Platform drafts">
         {drafts.map((draft) => {
-          const { body, url } = splitArticleLink(draft.content);
+          const postText = getCopiedPostText(draft.content, draft.hashtags);
           return (
           <div className="draft-editor" key={draft.platform}>
           <div className="draft-topline">
@@ -151,26 +164,16 @@ function CampaignCard({
           </div>
           <textarea
             className="textarea draft-copy"
-            value={body}
-            onChange={(event) => updateDraft(
-              draft.platform,
-              [event.target.value.trim(), url ? `Read the full article on our website: ${url}` : ""].filter(Boolean).join("\n\n"),
-            )}
+            value={postText}
+            ref={(element) => {
+              if (!element) return;
+              element.style.height = "auto";
+              element.style.height = `${element.scrollHeight}px`;
+            }}
+            onChange={(event) => updateDraft(draft.platform, event.target.value)}
             aria-label={`${platformNames[draft.platform] ?? draft.platform} draft copy`}
             data-testid={`textarea-draft-${campaign.id}-${draft.platform}`}
           />
-          {draft.hashtags.length > 0 && (
-            <div className="hashtag-row" data-testid={`hashtags-${campaign.id}-${draft.platform}`}>
-              {draft.hashtags.map((tag) => (
-                <span className="hashtag" key={tag}>{tag.startsWith("#") ? tag : `#${tag}`}</span>
-              ))}
-            </div>
-          )}
-          {url && (
-            <div className="article-link-row" data-testid={`article-link-${campaign.id}-${draft.platform}`}>
-              Read the full article on our website: <a href={url} target="_blank" rel="noreferrer">{url}</a>
-            </div>
-          )}
           {copyErrorPlatform === draft.platform && (
             <div className="copy-error" role="status">Could not copy. Try selecting and copying the text.</div>
           )}

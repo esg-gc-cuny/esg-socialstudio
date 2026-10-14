@@ -7,6 +7,7 @@ import {
   buildAnalysisRetryPrompt,
   buildPlatformPrompt,
   buildPlatformRetryPrompt,
+  getTitleTopicTerms,
   platformRules,
   type ArticleAnalysis,
   type HookAngle,
@@ -44,6 +45,7 @@ type SingleVariant = {
   format: "single";
   angle: HookAngle;
   content: string;
+  invitation: string;
   hashtags: unknown;
 };
 
@@ -133,6 +135,10 @@ function parseArticleAnalysis(text: string): ArticleAnalysis {
   }
 
   const core_thesis = requireText(parsed.core_thesis, "core_thesis");
+  const author_byline =
+    parsed.author_byline === null
+      ? null
+      : requireText(parsed.author_byline, "author_byline");
   const reader_payoff = requireText(parsed.reader_payoff, "reader_payoff");
   const tension = requireText(parsed.tension, "tension");
   const audience = requireText(parsed.audience, "audience");
@@ -194,9 +200,14 @@ function parseArticleAnalysis(text: string): ArticleAnalysis {
   if (new Set(hook_angles.map((angle) => angle.angle)).size !== 4) {
     throw new Error("hook_angles must use four different angle labels.");
   }
+  const questionAngle = hook_angles.find((angle) => angle.angle === "question");
+  if (!questionAngle || !questionAngle.hook.includes("?")) {
+    throw new Error("hook_angles must include one source-grounded question ending with a question mark.");
+  }
 
   return {
     core_thesis,
+    author_byline,
     reader_payoff,
     tension,
     best_details,
@@ -265,7 +276,13 @@ function normalizeHashtags(platform: PlatformId, value: unknown): string[] {
 }
 
 function hasNonThirdPersonText(text: string): boolean {
-  return forbiddenPerspectivePattern.test(text.replace(/https?:\/\/\S+/gi, ""));
+  const allowedPublisherVoice = text.replace(
+    /\bour (?:newly published|new) article\b/gi,
+    "the new article",
+  );
+  return forbiddenPerspectivePattern.test(
+    allowedPublisherVoice.replace(/https?:\/\/\S+/gi, ""),
+  );
 }
 
 function copyText(content: string, hashtags: string[], sourceUrl: string | null): string {
@@ -312,6 +329,31 @@ function removeArticleOverviewSentences(content: string): string {
     .trim();
 }
 
+function removeUnsupportedBroadClaims(content: string, source: string): string {
+  const sourceText = source.toLocaleLowerCase();
+  const broadClaims = ["most people", "everyone", "no one", "nobody"];
+  return splitCompleteSentences(content)
+    .map((sentence) => {
+      let cleaned = sentence;
+      for (const phrase of broadClaims) {
+        const phraseIndex = cleaned.toLocaleLowerCase().indexOf(phrase);
+        if (phraseIndex < 0 || sourceText.includes(phrase)) continue;
+        if (phraseIndex === 0) return "";
+        const suffix = cleaned.slice(phraseIndex);
+        if (suffix.split(/\s+/).length > 10) return "";
+        const prefix = cleaned
+          .slice(0, phraseIndex)
+          .replace(/[,:;]\s*$/, "")
+          .trim()
+          .replace(/[.!?]+$/, "");
+        cleaned = prefix ? `${prefix}.` : "";
+      }
+      return cleaned;
+    })
+    .filter(Boolean)
+    .join(" ");
+}
+
 function limitTeaserSentences(content: string, maximum: number): string {
   const sentences = splitCompleteSentences(content);
   if (sentences.length <= maximum) return content;
@@ -323,6 +365,40 @@ function limitTeaserSentences(content: string, maximum: number): string {
   const kept = sentences.slice(0, Math.max(1, maximum - (lastQuestion ? 1 : 0)));
   if (lastQuestion && !kept.includes(lastQuestion)) kept.push(lastQuestion);
   return kept.join(" ").trim();
+}
+
+function fitTeaserWithInvitation(
+  teaser: string,
+  invitation: string,
+  hashtags: string[],
+  sourceUrl: string | null,
+  maxCharacters: number,
+): string {
+  const join = (text: string) => [text.trim(), invitation.trim()].filter(Boolean).join("\n\n");
+  let sentences = splitCompleteSentences(teaser);
+  let compactedTeaser = teaser.trim();
+
+  while (
+    copyText(join(compactedTeaser), hashtags, sourceUrl).length > maxCharacters &&
+    sentences.length > 1
+  ) {
+    sentences = sentences.slice(0, -1);
+    compactedTeaser = sentences.join(" ").trim();
+  }
+
+  let combined = join(compactedTeaser);
+  if (copyText(combined, hashtags, sourceUrl).length <= maxCharacters) return combined;
+
+  const teaserBudget = Math.max(
+    0,
+    bodyCharacterBudget(maxCharacters, hashtags, sourceUrl) - invitation.length - 2,
+  );
+  const clause = trimAtClauseBoundary(compactedTeaser, teaserBudget);
+  if (!clause) return "";
+  combined = join(clause);
+  if (copyText(combined, hashtags, sourceUrl).length <= maxCharacters) return combined;
+
+  return "";
 }
 
 function bodyCharacterBudget(
@@ -359,33 +435,6 @@ function trimAtClauseBoundary(content: string, characterBudget: number): string 
     return `${clause.replace(/[.!?]+$/, "")}.`;
   }
   return "";
-}
-
-function compactToCharacterLimit(
-  content: string,
-  hashtags: string[],
-  sourceUrl: string | null,
-  maxCharacters: number,
-): string {
-  let compacted = content;
-  let sentences = splitCompleteSentences(content);
-  while (
-    copyText(compacted, hashtags, sourceUrl).length > maxCharacters &&
-    sentences.length > 1 &&
-    /[.!?]["'’”)]*$/.test(sentences[sentences.length - 1])
-  ) {
-    sentences = sentences.slice(0, -1);
-    compacted = sentences.join(" ");
-  }
-
-  if (copyText(compacted, hashtags, sourceUrl).length <= maxCharacters) {
-    return compacted;
-  }
-  const clause = trimAtClauseBoundary(
-    compacted,
-    bodyCharacterBudget(maxCharacters, hashtags, sourceUrl),
-  );
-  return clause || compacted;
 }
 
 function appendCta(content: string, sourceUrl: string | null): string {
@@ -542,10 +591,14 @@ function parsePlatformResponse(
     if (format !== "single" || typeof value.content !== "string") {
       throw new Error(`${platformNames[platform]} variant ${index + 1} must be a single post.`);
     }
+    if (typeof value.invitation !== "string" || !value.invitation.trim()) {
+      throw new Error(`${platformNames[platform]} variant ${index + 1} is missing its article invitation.`);
+    }
     return {
       format: "single",
       angle,
       content: value.content,
+      invitation: value.invitation,
       hashtags: value.hashtags,
     };
   });
@@ -572,8 +625,41 @@ function selectPlatformDraft(
   response: PlatformResponse,
   platform: PlatformId,
   context: GenerationContext,
+  analysis: ArticleAnalysis,
 ): PlatformDraft {
   const rules = platformRules[platform];
+  const titleTopicTerms = getTitleTopicTerms(context.title);
+  const author = analysis.author_byline;
+  const topicTerm = titleTopicTerms[0] ?? "";
+  const topicPhrase =
+    topicTerm === "stablecoins" ? "stablecoin use" : topicTerm || "the findings";
+  const articleLead = platform === "bluesky" ? "Our new article" : "Our newly published article";
+  const fallbackBylineInvitation = author
+    ? `${articleLead} by ${author} explores what ${topicTerm || "the findings"} could mean.`
+    : "";
+  const blueskyBylineInvitation = author
+    ? `Our new article by ${author} follows this question.`
+    : "";
+  const mentionsTopic = (text: string) =>
+    titleTopicTerms.some((term) => {
+      const singular = term.endsWith("s") ? term.slice(0, -1) : term;
+      return text.toLocaleLowerCase().includes(term) ||
+        (singular !== term && text.toLocaleLowerCase().includes(singular));
+    });
+  const includeByline =
+    Boolean(author) &&
+    (platform === "bluesky"
+      ? blueskyBylineInvitation.length <= rules.invitationMaxCharacters
+      : fallbackBylineInvitation.length <= rules.invitationMaxCharacters);
+  const fallbackInvitation =
+    platform === "bluesky"
+      ? includeByline
+        ? blueskyBylineInvitation
+        : "Our new article follows this question."
+      : includeByline && fallbackBylineInvitation
+        ? fallbackBylineInvitation
+        : `${articleLead} explores what ${topicTerm || "the findings"} could mean.`;
+  const questionHook = analysis.hook_angles.find((angle) => angle.angle === "question")?.hook ?? "";
   const singleVariants = response.variants
     .map((variant, index) => ({ variant, index }))
     .filter(
@@ -582,6 +668,7 @@ function selectPlatformDraft(
     );
   const singleCandidates = singleVariants.map(({ variant, index }) => ({
     content: variant.content,
+    invitation: variant.invitation,
     hashtags: variant.hashtags,
     index,
   }));
@@ -589,8 +676,9 @@ function selectPlatformDraft(
     platform === "bluesky"
       ? response.variants.flatMap((variant, index) =>
           variant.format === "thread"
-            ? variant.posts.map((content, postIndex) => ({
+              ? variant.posts.map((content, postIndex) => ({
                 content,
+                invitation: fallbackInvitation,
                 hashtags: variant.hashtags,
                 index: response.variants.length + index + postIndex,
               }))
@@ -607,19 +695,114 @@ function selectPlatformDraft(
   const rejected: string[] = [];
 
   for (const candidate of candidates) {
-    let content = limitTeaserSentences(
+    let teaserSource = removeUnsupportedBroadClaims(
       removeArticleOverviewSentences(normalizeContent(candidate.content)),
-      rules.maxTeaserSentences,
+      context.content,
     );
-    if (!content) {
+    if (platform === "bluesky" && (!teaserSource || !teaserSource.includes("?"))) {
+      teaserSource = normalizeContent(questionHook);
+    }
+    if (topicTerm) {
+      teaserSource = teaserSource.replace(
+        /\b(?:this|that) (?:model|system|shift|approach|trend)\b/gi,
+        topicPhrase,
+      );
+      teaserSource = teaserSource.replace(
+        /\b(?:this|that)\b(?=\s+(?:reshape|shift|change|move|influence|affect|alter|drive|push|scale|grow)\b)/gi,
+        topicTerm,
+      );
+      if (!mentionsTopic(teaserSource)) {
+        teaserSource = `${topicTerm.charAt(0).toLocaleUpperCase()}${topicTerm.slice(1)}: ${teaserSource}`;
+      }
+    }
+    let teaser = limitTeaserSentences(
+      teaserSource,
+      Math.max(1, rules.maxTeaserSentences - 1),
+    );
+    if (titleTopicTerms.length && !mentionsTopic(teaser)) {
+      teaser = `${topicTerm.charAt(0).toLocaleUpperCase()}${topicTerm.slice(1)}: ${teaser}`;
+    }
+    let invitation = limitTeaserSentences(normalizeContent(candidate.invitation), 1);
+    if (!teaser || !invitation) {
       rejected.push("empty post text");
       continue;
     }
+    const allowedInvitationStarts = includeByline
+      ? platform === "bluesky"
+        ? [
+            `our new article by ${author?.toLocaleLowerCase()}`,
+            `our newly published article by ${author?.toLocaleLowerCase()}`,
+          ]
+        : [`our newly published article by ${author?.toLocaleLowerCase()}`]
+      : platform === "bluesky"
+        ? ["our new article", "our newly published article", "the new article", "a new article", "new article"]
+        : ["our newly published article"];
+    const startsAsPublisher = (text: string) =>
+      allowedInvitationStarts.some((start) => text.toLocaleLowerCase().startsWith(start));
+    const hasInvitationSignal = (text: string) =>
+      /\b(?:asks?|invites?|readers?|question|why|whether|what|where|how|tension|surprising|unexpected|explores?|examines?|traces?|reveals?|shows?|connects?|tests?)\b/i.test(text);
+    const invitationIsGeneric = (text: string) =>
+      /\b(?:offers? a closer look|explores? further|fuller picture|works? through|walks? through|weighs?|benefits and risks)\b/i.test(text) ||
+      text.includes(",");
+    const isSuitableInvitation = (text: string) =>
+      startsAsPublisher(text) &&
+      text.length <= rules.invitationMaxCharacters &&
+      /\b(?:new article|new analysis|newly published|new research)\b/i.test(text) &&
+      hasInvitationSignal(text) &&
+      !invitationIsGeneric(text) &&
+      (platform === "bluesky" || titleTopicTerms.length === 0 || mentionsTopic(text));
+    if (invitation.length > rules.invitationMaxCharacters) {
+      const shortened = trimAtClauseBoundary(invitation, rules.invitationMaxCharacters);
+      if (shortened && isSuitableInvitation(shortened)) invitation = shortened;
+    }
+    if (!isSuitableInvitation(invitation)) {
+      invitation = fallbackInvitation;
+    }
+    if (!/\b(?:new article|new analysis|newly published|new research)\b/i.test(invitation)) {
+      rejected.push("invitation does not identify the new article");
+      continue;
+    }
+    if (invitation.length > rules.invitationMaxCharacters) {
+      rejected.push(`invitation exceeds ${rules.invitationMaxCharacters} characters`);
+      continue;
+    }
+    const normalizedInvitation = invitation.toLocaleLowerCase();
+    if (!allowedInvitationStarts.some((start) => normalizedInvitation.startsWith(start))) {
+      rejected.push(
+        includeByline
+          ? "invitation does not include the verified author byline"
+          : "invitation does not use the publisher's article voice",
+      );
+      continue;
+    }
+    if (
+      invitationIsGeneric(invitation) ||
+      !hasInvitationSignal(invitation)
+    ) {
+      rejected.push("invitation is generic, summary-like, or lists article contents");
+      continue;
+    }
+    const hasOpenLoop =
+      teaser.includes("?") ||
+      /\b(?:but|yet|still|could|may|might|whether|raises?|risk|uncertain|unknown)\b/i.test(teaser);
+    if (!hasOpenLoop) {
+      rejected.push("teaser is missing a source-grounded curiosity question");
+      continue;
+    }
+    if (titleTopicTerms.length && !mentionsTopic(teaser)) {
+      rejected.push("teaser does not name the article topic");
+      continue;
+    }
+    if (platform !== "bluesky" && titleTopicTerms.length && !mentionsTopic(invitation)) {
+      rejected.push("invitation does not name the article topic");
+      continue;
+    }
+    let content = [teaser, invitation].filter(Boolean).join("\n\n");
     if (hasNonThirdPersonText(content)) {
       rejected.push("first-person or second-person wording");
       continue;
     }
-    if (/\b(?:Economic Studies Group|the Group)\b/i.test(content)) {
+    if (/\b(?:Economic Studies Group|the Group|(?:CUNY )?ESG team)\b/i.test(content)) {
       rejected.push("publisher name in post text");
       continue;
     }
@@ -627,12 +810,28 @@ function selectPlatformDraft(
     const hashtags = normalizeHashtags(platform, candidate.hashtags);
     let fullText = copyText(content, hashtags, context.sourceUrl);
     if (fullText.length > rules.maxCharacters) {
-      content = compactToCharacterLimit(
-        content,
+      content = fitTeaserWithInvitation(
+        teaser,
+        invitation,
         hashtags,
         context.sourceUrl,
         rules.maxCharacters,
       );
+      if (!content && platform === "bluesky") {
+        const compactHook = topicTerm
+          ? `What could ${topicTerm} mean for money?`
+          : "What could these findings mean for money?";
+        const compactContent = [compactHook, invitation].join("\n\n");
+        const compactFullText = copyText(compactContent, hashtags, context.sourceUrl);
+        if (compactFullText.length <= rules.maxCharacters) {
+          content = compactContent;
+          fullText = compactFullText;
+        }
+      }
+      if (!content) {
+        rejected.push(`over ${rules.maxCharacters} characters with required invitation`);
+        continue;
+      }
       fullText = copyText(content, hashtags, context.sourceUrl);
     }
     const characterCount = fullText.length;
@@ -686,7 +885,7 @@ async function generateOnePlatform(
   try {
     const parsed = parsePlatformResponse(first.text, platform, analysis);
     return {
-      draft: selectPlatformDraft(parsed, platform, context),
+      draft: selectPlatformDraft(parsed, platform, context, analysis),
       usage: first,
     };
   } catch (error) {
@@ -704,7 +903,7 @@ async function generateOnePlatform(
     try {
       const parsed = parsePlatformResponse(retry.text, platform, analysis);
       return {
-        draft: selectPlatformDraft(parsed, platform, context),
+        draft: selectPlatformDraft(parsed, platform, context, analysis),
         usage: {
           inputTokens: first.inputTokens + retry.inputTokens,
           outputTokens: first.outputTokens + retry.outputTokens,
