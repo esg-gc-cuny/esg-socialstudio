@@ -277,8 +277,8 @@ function normalizeHashtags(platform: PlatformId, value: unknown): string[] {
 
 function hasNonThirdPersonText(text: string): boolean {
   const allowedPublisherVoice = text.replace(
-    /\bour (?:newly published|new) article\b/gi,
-    "the new article",
+    /\bour(?: newly published| new| latest)? article\b/gi,
+    "the article",
   );
   return forbiddenPerspectivePattern.test(
     allowedPublisherVoice.replace(/https?:\/\/\S+/gi, ""),
@@ -374,7 +374,7 @@ function fitTeaserWithInvitation(
   sourceUrl: string | null,
   maxCharacters: number,
 ): string {
-  const join = (text: string) => [text.trim(), invitation.trim()].filter(Boolean).join("\n\n");
+  const join = (text: string) => [text.trim(), invitation.trim()].filter(Boolean).join(" ");
   let sentences = splitCompleteSentences(teaser);
   let compactedTeaser = teaser.trim();
 
@@ -391,7 +391,7 @@ function fitTeaserWithInvitation(
 
   const teaserBudget = Math.max(
     0,
-    bodyCharacterBudget(maxCharacters, hashtags, sourceUrl) - invitation.length - 2,
+    bodyCharacterBudget(maxCharacters, hashtags, sourceUrl) - invitation.length - 1,
   );
   const clause = trimAtClauseBoundary(compactedTeaser, teaserBudget);
   if (!clause) return "";
@@ -633,33 +633,33 @@ function selectPlatformDraft(
   const topicTerm = titleTopicTerms[0] ?? "";
   const topicPhrase =
     topicTerm === "stablecoins" ? "stablecoin use" : topicTerm || "the findings";
-  const articleLead = platform === "bluesky" ? "Our new article" : "Our newly published article";
-  const fallbackBylineInvitation = author
-    ? `${articleLead} by ${author} explores what ${topicTerm || "the findings"} could mean.`
+  const fallbackTopic = topicTerm === "stablecoins"
+    ? "stablecoin use"
+    : titleTopicTerms.length
+      ? `the ${titleTopicTerms.slice(0, 2).join(" ")}`
+      : "the evidence";
+  const bylineInvitation = author
+    ? `The article by ${author} traces the forces reshaping ${fallbackTopic}.`
     : "";
-  const blueskyBylineInvitation = author
-    ? `Our new article by ${author} follows this question.`
-    : "";
-  const mentionsTopic = (text: string) =>
-    titleTopicTerms.some((term) => {
-      const singular = term.endsWith("s") ? term.slice(0, -1) : term;
-      return text.toLocaleLowerCase().includes(term) ||
-        (singular !== term && text.toLocaleLowerCase().includes(singular));
-    });
-  const includeByline =
-    Boolean(author) &&
-    (platform === "bluesky"
-      ? blueskyBylineInvitation.length <= rules.invitationMaxCharacters
-      : fallbackBylineInvitation.length <= rules.invitationMaxCharacters);
   const fallbackInvitation =
-    platform === "bluesky"
-      ? includeByline
-        ? blueskyBylineInvitation
-        : "Our new article follows this question."
-      : includeByline && fallbackBylineInvitation
-        ? fallbackBylineInvitation
-        : `${articleLead} explores what ${topicTerm || "the findings"} could mean.`;
+    bylineInvitation && bylineInvitation.length <= rules.invitationMaxCharacters
+      ? bylineInvitation
+      : topicTerm
+        ? `The article traces the forces reshaping ${fallbackTopic}.`
+        : "The analysis connects the evidence to the article's central question.";
   const questionHook = analysis.hook_angles.find((angle) => angle.angle === "question")?.hook ?? "";
+  const hasUnanchoredDemonstrative = (text: string) => {
+    const opening = splitCompleteSentences(text)[0] ?? text;
+    return /\b(?:this|that|these|those)\s+(?:reversal|gap|shift|trend|change|question|result|pattern|difference)\b/i.test(opening) &&
+      !titleTopicTerms.some((term) => opening.toLocaleLowerCase().includes(term));
+  };
+  const contextualBlueskyHook = [
+    analysis.tension,
+    ...analysis.best_details.map((detail) => detail.detail),
+    questionHook,
+  ]
+    .map((text) => normalizeContent(text))
+    .find((text) => text && !hasUnanchoredDemonstrative(text)) ?? normalizeContent(questionHook);
   const singleVariants = response.variants
     .map((variant, index) => ({ variant, index }))
     .filter(
@@ -699,8 +699,13 @@ function selectPlatformDraft(
       removeArticleOverviewSentences(normalizeContent(candidate.content)),
       context.content,
     );
-    if (platform === "bluesky" && (!teaserSource || !teaserSource.includes("?"))) {
-      teaserSource = normalizeContent(questionHook);
+    if (
+      platform === "bluesky" &&
+      (!teaserSource ||
+        !teaserSource.includes("?") ||
+        hasUnanchoredDemonstrative(teaserSource))
+    ) {
+      teaserSource = contextualBlueskyHook;
     }
     if (topicTerm) {
       teaserSource = teaserSource.replace(
@@ -711,46 +716,28 @@ function selectPlatformDraft(
         /\b(?:this|that)\b(?=\s+(?:reshape|shift|change|move|influence|affect|alter|drive|push|scale|grow)\b)/gi,
         topicTerm,
       );
-      if (!mentionsTopic(teaserSource)) {
-        teaserSource = `${topicTerm.charAt(0).toLocaleUpperCase()}${topicTerm.slice(1)}: ${teaserSource}`;
-      }
     }
-    let teaser = limitTeaserSentences(
-      teaserSource,
-      Math.max(1, rules.maxTeaserSentences - 1),
-    );
-    if (titleTopicTerms.length && !mentionsTopic(teaser)) {
-      teaser = `${topicTerm.charAt(0).toLocaleUpperCase()}${topicTerm.slice(1)}: ${teaser}`;
-    }
+    let teaser = platform === "bluesky"
+      ? (splitCompleteSentences(teaserSource)[0] ?? "").trim()
+      : limitTeaserSentences(
+          teaserSource,
+          Math.max(1, rules.maxTeaserSentences - 1),
+        );
     let invitation = limitTeaserSentences(normalizeContent(candidate.invitation), 1);
     if (!teaser || !invitation) {
       rejected.push("empty post text");
       continue;
     }
-    const allowedInvitationStarts = includeByline
-      ? platform === "bluesky"
-        ? [
-            `our new article by ${author?.toLocaleLowerCase()}`,
-            `our newly published article by ${author?.toLocaleLowerCase()}`,
-          ]
-        : [`our newly published article by ${author?.toLocaleLowerCase()}`]
-      : platform === "bluesky"
-        ? ["our new article", "our newly published article", "the new article", "a new article", "new article"]
-        : ["our newly published article"];
-    const startsAsPublisher = (text: string) =>
-      allowedInvitationStarts.some((start) => text.toLocaleLowerCase().startsWith(start));
     const hasInvitationSignal = (text: string) =>
-      /\b(?:asks?|invites?|readers?|question|why|whether|what|where|how|tension|surprising|unexpected|explores?|examines?|traces?|reveals?|shows?|connects?|tests?)\b/i.test(text);
+      /\b(?:asks?|invites?|readers?|question|why|whether|what|where|how|tension|surprising|unexpected|explores?|examines?|traces?|reveals?|shows?|connects?|tests?|follows?|read|discover|learn)\b/i.test(text);
     const invitationIsGeneric = (text: string) =>
       /\b(?:offers? a closer look|explores? further|fuller picture|works? through|walks? through|weighs?|benefits and risks)\b/i.test(text) ||
+      /\b(?:follows?|examines? (?:the evidence behind )?)(?: this| that) question\b/i.test(text) ||
       text.includes(",");
     const isSuitableInvitation = (text: string) =>
-      startsAsPublisher(text) &&
       text.length <= rules.invitationMaxCharacters &&
-      /\b(?:new article|new analysis|newly published|new research)\b/i.test(text) &&
       hasInvitationSignal(text) &&
-      !invitationIsGeneric(text) &&
-      (platform === "bluesky" || titleTopicTerms.length === 0 || mentionsTopic(text));
+      !invitationIsGeneric(text);
     if (invitation.length > rules.invitationMaxCharacters) {
       const shortened = trimAtClauseBoundary(invitation, rules.invitationMaxCharacters);
       if (shortened && isSuitableInvitation(shortened)) invitation = shortened;
@@ -758,21 +745,8 @@ function selectPlatformDraft(
     if (!isSuitableInvitation(invitation)) {
       invitation = fallbackInvitation;
     }
-    if (!/\b(?:new article|new analysis|newly published|new research)\b/i.test(invitation)) {
-      rejected.push("invitation does not identify the new article");
-      continue;
-    }
     if (invitation.length > rules.invitationMaxCharacters) {
       rejected.push(`invitation exceeds ${rules.invitationMaxCharacters} characters`);
-      continue;
-    }
-    const normalizedInvitation = invitation.toLocaleLowerCase();
-    if (!allowedInvitationStarts.some((start) => normalizedInvitation.startsWith(start))) {
-      rejected.push(
-        includeByline
-          ? "invitation does not include the verified author byline"
-          : "invitation does not use the publisher's article voice",
-      );
       continue;
     }
     if (
@@ -784,20 +758,12 @@ function selectPlatformDraft(
     }
     const hasOpenLoop =
       teaser.includes("?") ||
-      /\b(?:but|yet|still|could|may|might|whether|raises?|risk|uncertain|unknown)\b/i.test(teaser);
+      /\b(?:but|yet|still|while|despite|although|however|could|may|might|whether|raises?|risk|uncertain|unknown)\b/i.test(teaser);
     if (!hasOpenLoop) {
       rejected.push("teaser is missing a source-grounded curiosity question");
       continue;
     }
-    if (titleTopicTerms.length && !mentionsTopic(teaser)) {
-      rejected.push("teaser does not name the article topic");
-      continue;
-    }
-    if (platform !== "bluesky" && titleTopicTerms.length && !mentionsTopic(invitation)) {
-      rejected.push("invitation does not name the article topic");
-      continue;
-    }
-    let content = [teaser, invitation].filter(Boolean).join("\n\n");
+    let content = [teaser, invitation].filter(Boolean).join(" ");
     if (hasNonThirdPersonText(content)) {
       rejected.push("first-person or second-person wording");
       continue;
@@ -817,15 +783,17 @@ function selectPlatformDraft(
         context.sourceUrl,
         rules.maxCharacters,
       );
-      if (!content && platform === "bluesky") {
-        const compactHook = topicTerm
-          ? `What could ${topicTerm} mean for money?`
-          : "What could these findings mean for money?";
-        const compactContent = [compactHook, invitation].join("\n\n");
-        const compactFullText = copyText(compactContent, hashtags, context.sourceUrl);
-        if (compactFullText.length <= rules.maxCharacters) {
-          content = compactContent;
-          fullText = compactFullText;
+      if (!content && platform === "bluesky" && context.sourceUrl) {
+        const hookOnlyContent = fitTeaserWithInvitation(
+          teaser,
+          "",
+          hashtags,
+          context.sourceUrl,
+          rules.maxCharacters,
+        );
+        if (hookOnlyContent) {
+          content = hookOnlyContent;
+          fullText = copyText(content, hashtags, context.sourceUrl);
         }
       }
       if (!content) {

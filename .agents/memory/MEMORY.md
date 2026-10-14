@@ -1,1 +1,2 @@
 - [Social post length handling](social-post-length.md) — Fit complete teaser sentences to platform budgets, never by cutting mid-sentence.
+- [API development state](api-development-state.md) — Recreate sources after API workflow restarts; local source and campaign IDs may not persist.

@@ -5,13 +5,13 @@ description: Preserve readability while fitting short, platform-specific social 
 
 Never fit a social teaser by cutting in the middle of a sentence. Prefer complete sentences; if an overlong hook still matters, shorten at a grammatical clause boundary. Reserve space for the source URL, hashtags, and call to action before choosing the hook length.
 
-Start with a topic-specific teaser, not a generic announcement. Write in the publisher's third-person voice and identify the verified author in the invitation when the platform has room. “Our” is allowed in the article invitation and final CTA; do not use first-person singular, emojis, or unsupported audience claims. Give enough context to create curiosity without summarizing the full article.
+Start with a topic-specific teaser, not a generic announcement. Write in the publisher's third-person voice and integrate a verified author naturally when it strengthens the post, but do not force a fixed opening or byline. “Our” is allowed in natural publisher phrasing and the final CTA; avoid first-person singular, emojis, dash punctuation, and unsupported audience claims. Give enough context to create curiosity without summarizing the full article.
 
-Keep the hook, invitation, platform-appropriate hashtags, and final link CTA together as one complete post. When a source URL is available, put hashtags before the final line: “Read the full article on our website: [URL].”
+Join the hook and article invitation into one coherent paragraph; keep optional platform-appropriate hashtags and the final article CTA in the same copyable post. When a source URL is available, put hashtags before the final line: “Read the full article on our website: [URL].”
 
 **Why:** Character targets, especially posts with a long article URL, can otherwise leave a dangling phrase that reads like an error.
 
-**How to apply:** When generating or postprocessing social copy, budget the final CTA and hashtags first, then keep complete hook sentences within the remaining space. Use a verified byline and platform-specific invitation, keep the CTA visible in the post, and inspect the final copied text. Keep Bluesky especially concise.
+**How to apply:** When generating or postprocessing social copy, budget the final CTA and hashtags first, then keep complete hook sentences within the remaining space. Use a natural, article-specific transition; include a verified byline when it fits; add hashtags only when useful on that platform. Keep Bluesky especially concise and inspect the final copied text.
 
 For ESG Social Studio, use one selected, platform-specific teaser per platform. Never invent facts or author names; keep the article's explanation and conclusions for the reader to discover.
 
