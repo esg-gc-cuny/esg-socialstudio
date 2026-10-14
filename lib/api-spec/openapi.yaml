@@ -315,6 +315,7 @@ components:
         tone: { type: string, minLength: 1, maxLength: 120 }
         audience: { type: string, maxLength: 200 }
         campaignGoal: { type: string, maxLength: 200 }
+        generateHashtags: { type: boolean, default: true }
     CampaignReviewUpdate:
       type: object
       properties:

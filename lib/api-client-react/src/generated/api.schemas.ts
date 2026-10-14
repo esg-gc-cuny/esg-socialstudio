@@ -143,6 +143,7 @@ export interface CampaignGenerationInput {
   audience?: string;
   /** @maxLength 200 */
   campaignGoal?: string;
+  generateHashtags?: boolean;
 }
 
 export type CampaignReviewUpdateStatus = typeof CampaignReviewUpdateStatus[keyof typeof CampaignReviewUpdateStatus];

@@ -47,6 +47,7 @@ function Dashboard() {
   const [sourceContent, setSourceContent] = useState("");
   const [articleUrl, setArticleUrl] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["linkedin", "facebook", "bluesky", "substack"]);
+  const [generateHashtags, setGenerateHashtags] = useState(true);
   const [activeCampaignId, setActiveCampaignId] = useState<number | null>(null);
   const [activeView, setActiveView] = useState<"create" | "library">("create");
   const [notice, setNotice] = useState("");
@@ -123,7 +124,11 @@ function Dashboard() {
     document.getElementById("generated-drafts")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const generateForSource = (sourceId: number, selected: string[]) => {
+  const generateForSource = (
+    sourceId: number,
+    selected: string[],
+    shouldGenerateHashtags: boolean,
+  ) => {
     setActiveView("create");
     generateCampaign.mutate(
       {
@@ -132,6 +137,7 @@ function Dashboard() {
           provider: "anthropic",
           platforms: selected as CampaignGenerationInput["platforms"],
           tone: "Match the article's voice; write a concise teaser that invites readers to continue",
+          generateHashtags: shouldGenerateHashtags,
         },
       },
       {
@@ -149,7 +155,13 @@ function Dashboard() {
     );
   };
 
-  const saveAndGenerate = (rawTitle: string, rawContent: string, selected: string[], sourceUrl?: string) => {
+  const saveAndGenerate = (
+    rawTitle: string,
+    rawContent: string,
+    selected: string[],
+    shouldGenerateHashtags: boolean,
+    sourceUrl?: string,
+  ) => {
     const content = rawContent.trim();
     if (content.length < 20) {
       notify("Not enough article text was found. Paste the text instead.");
@@ -163,7 +175,7 @@ function Dashboard() {
       ? sources.find((source) => source.sourceUrl === sourceUrl && source.content === content)
       : sources.find((source) => !source.sourceUrl && source.title === title && source.content === content);
     if (savedSource) {
-      generateForSource(savedSource.id, selected);
+      generateForSource(savedSource.id, selected, shouldGenerateHashtags);
       return;
     }
 
@@ -172,7 +184,7 @@ function Dashboard() {
       {
         onSuccess: (source) => {
           void queryClient.invalidateQueries({ queryKey: getListSourcesQueryKey() });
-          generateForSource(source.id, selected);
+          generateForSource(source.id, selected, shouldGenerateHashtags);
         },
         onError: () => notify("The article could not be saved. Please try again."),
       },
@@ -187,8 +199,9 @@ function Dashboard() {
     }
 
     const selected = [...selectedPlatforms];
+    const shouldGenerateHashtags = generateHashtags;
     if (inputMode === "paste") {
-      saveAndGenerate("", sourceContent, selected);
+      saveAndGenerate("", sourceContent, selected, shouldGenerateHashtags);
       return;
     }
 
@@ -196,7 +209,13 @@ function Dashboard() {
       { data: { url: articleUrl.trim() } },
       {
         onSuccess: (article) => {
-          saveAndGenerate(article.title, article.content, selected, article.url);
+          saveAndGenerate(
+            article.title,
+            article.content,
+            selected,
+            shouldGenerateHashtags,
+            article.url,
+          );
         },
         onError: () => notify("Could not read that link. Try a public page or paste the text instead."),
       },
@@ -320,6 +339,17 @@ function Dashboard() {
                 />
               </div>
             )}
+            <label className="hashtag-toggle" htmlFor="generate-hashtags">
+              <input
+                id="generate-hashtags"
+                type="checkbox"
+                checked={generateHashtags}
+                onChange={(event) => setGenerateHashtags(event.target.checked)}
+                data-testid="checkbox-generate-hashtags"
+              />
+              <span>Generate relevant hashtags</span>
+              <small>Include all that fit each platform</small>
+            </label>
             <div className="platform-picker-heading">
               <label>Platforms</label>
             </div>

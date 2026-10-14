@@ -1056,6 +1056,39 @@ a {
   letter-spacing: .07em;
 }
 
+.hashtag-toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 14px;
+  padding: 9px 11px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 3px;
+  color: hsl(var(--foreground));
+  background: hsl(var(--card));
+  cursor: pointer;
+}
+
+.hashtag-toggle input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: hsl(var(--primary));
+  flex: 0 0 auto;
+}
+
+.hashtag-toggle span {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hashtag-toggle small {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+}
+
 .platform-pick-actions {
   display: flex;
   gap: 10px;

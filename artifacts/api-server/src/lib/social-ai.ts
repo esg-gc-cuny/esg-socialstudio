@@ -25,6 +25,7 @@ type GenerationContext = {
   provider: ProviderId;
   platforms: PlatformId[];
   tone: string;
+  generateHashtags: boolean;
   audience?: string;
   campaignGoal?: string;
 };
@@ -255,9 +256,13 @@ function normalizeContent(rawContent: string): string {
     .trim();
 }
 
-function normalizeHashtags(platform: PlatformId, value: unknown): string[] {
+function normalizeHashtags(
+  platform: PlatformId,
+  value: unknown,
+  generateHashtags: boolean,
+): string[] {
   const policy = platformRules[platform];
-  if (!Array.isArray(value) || policy.maxHashtags === 0) return [];
+  if (!generateHashtags || !Array.isArray(value) || policy.maxHashtags === 0) return [];
   const excluded = new Set(["#researchcommunication", "#evidenceinpractice"]);
   const tags: string[] = [];
   for (const rawTag of value) {
@@ -658,12 +663,34 @@ function selectPlatformDraft(
     titleTopicTerms
       .slice(0, Math.min(2, titleTopicTerms.length))
       .every((term) => text.toLocaleLowerCase().includes(term));
+  const hasUnfinishedConditionalQuestion = (text: string) =>
+    splitCompleteSentences(text).some((sentence) =>
+      /^\s*(?:if|whether)\b[^?]*\?\s*$/i.test(sentence) &&
+      !/,/.test(sentence),
+    );
   const blueBodyBudget = bodyCharacterBudget(rules.maxCharacters, [], context.sourceUrl);
-  const contextualDetail = analysis.best_details
-    .map((detail) => normalizeContent(detail.detail))
-    .find((text) => text && hasArticleTopic(text) && !hasUnanchoredDemonstrative(text)) ?? "";
+  const articleSentences = splitCompleteSentences(normalizeContent(context.content));
+  const contextualDetail = [
+    ...analysis.best_details.map((detail) => normalizeContent(detail.detail)),
+    ...articleSentences,
+  ].find((text) => text && hasArticleTopic(text) && !hasUnanchoredDemonstrative(text)) ?? "";
   const detailSentence = splitCompleteSentences(contextualDetail)[0] ?? contextualDetail;
-  const contextualQuestion = normalizeContent(questionHook);
+  const questionSentence = splitCompleteSentences(normalizeContent(questionHook))
+    .find((sentence) => sentence.includes("?")) ?? "";
+  const questionBudget = Math.max(45, Math.min(100, blueBodyBudget - 35));
+  const compactQuestion = questionSentence.length <= questionBudget
+    ? questionSentence
+    : trimAtClauseBoundary(questionSentence, questionBudget);
+  const generatedQuestion = compactQuestion
+    ? `${compactQuestion.replace(/[.!?]+$/, "")}?`
+    : topicTerm
+      ? `What could this mean for ${topicPhrase}?`
+      : "";
+  const contextualQuestion = hasUnfinishedConditionalQuestion(generatedQuestion)
+    ? topicTerm
+      ? `What could this mean for ${topicPhrase}?`
+      : ""
+    : generatedQuestion;
   const detailBudget = blueBodyBudget - contextualQuestion.length - 1;
   const compactDetail = detailSentence.length <= detailBudget
     ? detailSentence
@@ -715,6 +742,7 @@ function selectPlatformDraft(
       platform === "bluesky" &&
       (!teaserSource ||
         !teaserSource.includes("?") ||
+        hasUnfinishedConditionalQuestion(teaserSource) ||
         hasUnanchoredDemonstrative(teaserSource) ||
         !hasArticleTopic(teaserSource))
     ) {
@@ -790,10 +818,14 @@ function selectPlatformDraft(
       continue;
     }
 
-    let hashtags = normalizeHashtags(platform, candidate.hashtags);
+    let hashtags = normalizeHashtags(
+      platform,
+      candidate.hashtags,
+      context.generateHashtags,
+    );
     let fullText = copyText(content, hashtags, context.sourceUrl);
-    if (platform === "bluesky" && fullText.length > rules.maxCharacters && hashtags.length) {
-      hashtags = [];
+    while (fullText.length > rules.maxCharacters && hashtags.length) {
+      hashtags.pop();
       fullText = copyText(content, hashtags, context.sourceUrl);
     }
     if (fullText.length > rules.maxCharacters) {
@@ -824,7 +856,12 @@ function selectPlatformDraft(
       }
       fullText = copyText(content, hashtags, context.sourceUrl);
     }
-    if (platform === "bluesky" && (!hasOpenLoop(content) || !hasArticleTopic(content))) {
+    if (
+      platform === "bluesky" &&
+      (!hasOpenLoop(content) ||
+        !hasArticleTopic(content) ||
+        hasUnfinishedConditionalQuestion(content))
+    ) {
       rejected.push("Bluesky post lost its article context or open question after length fitting");
       continue;
     }
@@ -871,6 +908,7 @@ async function generateOnePlatform(
     sourceUrl: context.sourceUrl,
     analysis,
     tone: context.tone,
+    generateHashtags: context.generateHashtags,
     audience: context.audience,
     campaignGoal: context.campaignGoal,
   };

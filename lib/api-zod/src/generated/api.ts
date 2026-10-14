@@ -157,7 +157,7 @@ export const generateCampaignBodyAudienceMax = 200;
 
 export const generateCampaignBodyCampaignGoalMax = 200;
 
-
+export const generateCampaignBodyGenerateHashtagsDefault = true;
 
 export const GenerateCampaignBody = zod.object({
   "sourceId": zod.number().int(),
@@ -165,7 +165,8 @@ export const GenerateCampaignBody = zod.object({
   "platforms": zod.array(zod.enum(['linkedin', 'facebook', 'bluesky', 'substack', 'x', 'instagram'])).min(1),
   "tone": zod.string().min(1).max(generateCampaignBodyToneMax),
   "audience": zod.string().max(generateCampaignBodyAudienceMax).optional(),
-  "campaignGoal": zod.string().max(generateCampaignBodyCampaignGoalMax).optional()
+  "campaignGoal": zod.string().max(generateCampaignBodyCampaignGoalMax).optional(),
+  "generateHashtags": zod.boolean().default(generateCampaignBodyGenerateHashtagsDefault)
 })
 
 export const GenerateCampaignResponse = zod.object({

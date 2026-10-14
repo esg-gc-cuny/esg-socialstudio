@@ -243,6 +243,7 @@ router.post("/campaigns/generate", async (req, res): Promise<void> => {
         typeof generatePlatformDrafts
       >[0]["platforms"],
       tone: parsed.data.tone,
+      generateHashtags: parsed.data.generateHashtags ?? true,
       audience: parsed.data.audience,
       campaignGoal: parsed.data.campaignGoal,
     });

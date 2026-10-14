@@ -22,4 +22,5 @@ export interface CampaignGenerationInput {
   audience?: string;
   /** @maxLength 200 */
   campaignGoal?: string;
+  generateHashtags?: boolean;
 }
