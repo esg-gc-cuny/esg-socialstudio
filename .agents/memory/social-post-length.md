@@ -47,6 +47,12 @@ Write each platform independently for its audience, with its own tone, length, h
 
 **How to apply:** Preserve each platform's native editorial voice through validation. Questions remain optional. Budget Bluesky's full link first and combine context and invitation into a compact sentence when necessary.
 
+Invitation quality belongs in editorial instructions, not a narrow required-verb regex that rejects the whole generation.
+
+**Why:** Claude returned posts, but legitimate invitation wording failed a rigid pattern and made the app report generation failure across platforms.
+
+**How to apply:** Keep source-evidence, numeric grounding, author, perspective, and length checks. Give repair requests specific issues and put corrective instructions after the invalid draft so they are not overshadowed by it.
+
 Use a mix of recognizable subject hashtags and specific article-grounded tags where appropriate, rather than obscure compounds or generic promotional slogans.
 
 **Why:** The user requested as many relevant, source-grounded hashtags as fit, rather than an arbitrary 1–2 tag target.

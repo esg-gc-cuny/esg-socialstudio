@@ -98,17 +98,17 @@ test("hashtag toggle returns none even if the model ignores it", () => {
     { ...source, generateHashtags: false }).hashtags, []);
 });
 
-test("neutral statements do not pass as invitations", () => {
+test("editorial wording does not block a source-grounded batch", () => {
   const data = response();
   data.sentences[1].text = "Ada Reed and Ben Orr examine employment growth.";
-  assert.throws(() => parseIndependentPost(JSON.stringify(data), "linkedin", source), /actual invitation/);
+  assert.match(parseIndependentPost(JSON.stringify(data), "linkedin", source).content, /Ada Reed and Ben Orr/);
 });
 
 test("rejects first-person voice, unsupported evidence, fabricated numbers, and invented authors", () => {
   const cases: Array<[string, (data: ReturnType<typeof response>) => void, RegExp]> = [
     ["first person", (data) => { data.sentences[1].text = "Explore our view of uneven employment growth."; }, /third-person/],
     ["unsupported evidence", (data) => { data.sentences[0].evidence = ["This quote does not exist."]; }, /exact source/],
-    ["fabricated number", (data) => { data.sentences[0].text = "Employment has grown by 99 percent."; }, /number not present/],
+    ["fabricated number", (data) => { data.sentences[0].text = "Employment has grown by 99 percent."; }, /not present in the source/],
     ["invented byline", (data) => { data.authors = ["Invented Person"]; }, /verified by an exact byline/],
     ["detached voice", (data) => { data.sentences[0].text = "The article explores uneven growth."; }, /detached document/],
   ];
@@ -126,7 +126,7 @@ test("only the invalid platform gets one repair request", async () => {
     const count = (counts.get(platform) ?? 0) + 1;
     counts.set(platform, count);
     const data = response(platform);
-    if (platform === "facebook" && count === 1) data.sentences[1].text = "Ada Reed and Ben Orr examine employment growth.";
+    if (platform === "facebook" && count === 1) data.sentences[1].evidence = ["This evidence does not exist in the source."];
     return { text: JSON.stringify(data), inputTokens: 10, outputTokens: 5 };
   });
   assert.equal(counts.get("facebook"), 2);
@@ -160,4 +160,46 @@ test("disabled platforms and duplicate selections fail before any model calls", 
   const request = async () => { throw new Error("Should not call model."); };
   await assert.rejects(generateIndependentPosts({ ...source, platforms: ["x"] }, request), /Unsupported social platform/);
   await assert.rejects(generateIndependentPosts({ ...source, platforms: ["linkedin", "linkedin"] }, request), /distinct platform/);
+});
+
+test("a numerical repair explicitly removes inferred figures instead of weakening grounding", async () => {
+  let calls = 0;
+  await generateIndependentPosts({ ...source, platforms: ["linkedin"] }, async (prompt) => {
+    calls++;
+    const data = response();
+    if (calls === 1) data.sentences[0].text = "Employment has grown by 99 percent.";
+    else {
+      assert.match(prompt, /NO digits, statistics, or inferred dates/);
+      assert.match(prompt, /Numeric value\(s\) 99/);
+    }
+    return { text: JSON.stringify(data), inputTokens: 1, outputTokens: 1 };
+  });
+  assert.equal(calls, 2);
+});
+
+test("voice repair names the offending pronoun and places corrections after the invalid draft", async () => {
+  let calls = 0;
+  await generateIndependentPosts({ ...source, platforms: ["linkedin"] }, async (prompt) => {
+    calls++;
+    const data = response();
+    if (calls === 1) data.sentences[0].text = "Our employment figures show uneven growth.";
+    else {
+      assert.match(prompt, /VOICE REPAIR/);
+      assert.match(prompt, /body: Our/);
+      assert.ok(prompt.indexOf("Previous response") < prompt.lastIndexOf("VOICE REPAIR"));
+      assert.ok(prompt.endsWith("not the previous draft."));
+    }
+    return { text: JSON.stringify(data), inputTokens: 1, outputTokens: 1 };
+  });
+  assert.equal(calls, 2);
+});
+
+test("related-post footers cannot supply evidence or dates for the selected article", async () => {
+  await generateIndependentPosts({
+    ...source, platforms: ["linkedin"],
+    content: `${source.content}\nRelated Posts\nUnrelated policy in 2045.`,
+  }, async (prompt) => {
+    assert.ok(!prompt.includes("Unrelated policy in 2045"));
+    return { text: JSON.stringify(response()), inputTokens: 1, outputTokens: 1 };
+  });
 });

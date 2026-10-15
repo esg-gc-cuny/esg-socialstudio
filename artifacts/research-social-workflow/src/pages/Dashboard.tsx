@@ -54,9 +54,9 @@ function Dashboard() {
     campaigns.find((campaign) => campaign.id === activeCampaignId) ?? campaigns[0];
   const isGenerating = createSource.isPending || extractArticle.isPending || generateCampaign.isPending;
 
-  const notify = (message: string) => {
+  const notify = (message: string, duration = 2800) => {
     setNotice(message);
-    window.setTimeout(() => setNotice(""), 2800);
+    window.setTimeout(() => setNotice(""), duration);
   };
 
   const refreshAll = () => {
@@ -102,9 +102,14 @@ function Dashboard() {
           notify("Claude posts are ready to copy.");
           window.setTimeout(scrollToResults, 80);
         },
-        onError: () => {
+        onError: (error) => {
           refreshAll();
-          notify("The article was saved, but Claude could not generate posts. Try again.");
+          const data: unknown = error.data;
+          const detail = data && typeof data === "object" &&
+            "error" in data && typeof data.error === "string"
+            ? data.error
+            : "Posts could not be generated. Please try again.";
+          notify(`Article saved. ${detail}`, 12000);
         },
       },
     );
