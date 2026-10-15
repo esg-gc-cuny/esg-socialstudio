@@ -7,9 +7,11 @@
  */
 import type { CampaignGenerationInputPlatformsItem } from './campaignGenerationInputPlatformsItem';
 import type { CampaignGenerationInputProvider } from './campaignGenerationInputProvider';
+import type { SourceInput } from './sourceInput';
 
 export interface CampaignGenerationInput {
-  sourceId: number;
+  /** Source text is processed for this request only and is not stored. */
+  source: SourceInput;
   provider: CampaignGenerationInputProvider;
   /** @minItems 1 */
   platforms: CampaignGenerationInputPlatformsItem[];

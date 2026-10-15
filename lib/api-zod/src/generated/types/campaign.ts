@@ -11,7 +11,7 @@ import type { PlatformDraft } from './platformDraft';
 
 export interface Campaign {
   id: number;
-  sourceId: number;
+  sourceId?: number;
   sourceTitle: string;
   provider: CampaignProvider;
   model: string;

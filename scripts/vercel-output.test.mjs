@@ -25,8 +25,7 @@ test("build output routes API separately from static files and SPA", async () =>
 });
 
 test("bundled API starts without Replit AI credentials or PORT and serves API paths", async () => {
-  // Only these dummy values reach the isolated subprocess. No real credentials
-  // or database queries are needed for a health/providers smoke test.
+  // No database settings, Claude key, or Replit credentials reach this process.
   const child = spawn(process.execPath, ["--input-type=module", "-e", `
     import app from ${JSON.stringify(`file://${handler}`)};
     const server = app.listen(0, "127.0.0.1", () => {
@@ -37,7 +36,6 @@ test("bundled API starts without Replit AI credentials or PORT and serves API pa
       PATH: process.env.PATH,
       NODE_ENV: "production",
       VERCEL: "1",
-      DATABASE_URL: "postgresql://placeholder:placeholder@127.0.0.1:1/placeholder",
     },
     stdio: ["ignore", "pipe", "pipe"],
   });

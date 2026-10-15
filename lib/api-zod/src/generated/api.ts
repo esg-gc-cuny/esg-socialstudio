@@ -18,6 +18,8 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * Retired. Returns 410; articles are no longer saved.
+ * @deprecated
  * @summary List research sources
  */
 export const ListSourcesResponseItem = zod.object({
@@ -31,6 +33,8 @@ export const ListSourcesResponse = zod.array(ListSourcesResponseItem)
 
 
 /**
+ * Retired. Returns 410; include source content in the generation request instead.
+ * @deprecated
  * @summary Save a research source
  */
 export const createSourceBodyTitleMax = 200;
@@ -83,6 +87,8 @@ export const ExtractArticleResponse = zod.object({
 
 
 /**
+ * Retired. Returns 410; source content stays in the current browser tab.
+ * @deprecated
  * @summary Update a research source
  */
 export const UpdateSourceParams = zod.object({
@@ -112,6 +118,8 @@ export const UpdateSourceResponse = zod.object({
 
 
 /**
+ * Retired. Returns 410; existing database records are left untouched.
+ * @deprecated
  * @summary Delete a source and its campaigns
  */
 export const DeleteSourceParams = zod.object({
@@ -122,11 +130,13 @@ export const DeleteSourceResponse = zod.void()
 
 
 /**
+ * Retired. Returns 410; drafts are no longer saved on the server.
+ * @deprecated
  * @summary List generated campaigns
  */
 export const ListCampaignsResponseItem = zod.object({
   "id": zod.number().int(),
-  "sourceId": zod.number().int(),
+  "sourceId": zod.number().int().optional(),
   "sourceTitle": zod.string(),
   "provider": zod.enum(['openai', 'anthropic', 'gemini']),
   "model": zod.string(),
@@ -150,6 +160,11 @@ export const ListCampaignsResponse = zod.array(ListCampaignsResponseItem)
 /**
  * @summary Generate platform-specific draft copy from a research source
  */
+export const generateCampaignBodySourceTitleMax = 200;
+
+export const generateCampaignBodySourceContentMin = 20;
+export const generateCampaignBodySourceContentMax = 100000;
+
 
 export const generateCampaignBodyToneMax = 120;
 
@@ -160,9 +175,13 @@ export const generateCampaignBodyCampaignGoalMax = 200;
 export const generateCampaignBodyGenerateHashtagsDefault = true;
 
 export const GenerateCampaignBody = zod.object({
-  "sourceId": zod.number().int(),
+  "source": zod.object({
+  "title": zod.string().min(1).max(generateCampaignBodySourceTitleMax),
+  "content": zod.string().min(generateCampaignBodySourceContentMin).max(generateCampaignBodySourceContentMax),
+  "sourceUrl": zod.string().url().optional()
+}).describe('Source text is processed for this request only and is not stored.'),
   "provider": zod.enum(['openai', 'anthropic', 'gemini']),
-  "platforms": zod.array(zod.enum(['linkedin', 'facebook', 'bluesky', 'substack', 'x', 'instagram'])).min(1),
+  "platforms": zod.array(zod.enum(['linkedin', 'facebook', 'bluesky', 'substack'])).min(1),
   "tone": zod.string().min(1).max(generateCampaignBodyToneMax),
   "audience": zod.string().max(generateCampaignBodyAudienceMax).optional(),
   "campaignGoal": zod.string().max(generateCampaignBodyCampaignGoalMax).optional(),
@@ -171,7 +190,7 @@ export const GenerateCampaignBody = zod.object({
 
 export const GenerateCampaignResponse = zod.object({
   "id": zod.number().int(),
-  "sourceId": zod.number().int(),
+  "sourceId": zod.number().int().optional(),
   "sourceTitle": zod.string(),
   "provider": zod.enum(['openai', 'anthropic', 'gemini']),
   "model": zod.string(),
@@ -192,6 +211,8 @@ export const GenerateCampaignResponse = zod.object({
 
 
 /**
+ * Retired. Returns 410; draft edits are applied locally in the browser.
+ * @deprecated
  * @summary Edit draft copy or update its review status
  */
 export const ReviewCampaignParams = zod.object({
@@ -211,7 +232,7 @@ export const ReviewCampaignBody = zod.object({
 
 export const ReviewCampaignResponse = zod.object({
   "id": zod.number().int(),
-  "sourceId": zod.number().int(),
+  "sourceId": zod.number().int().optional(),
   "sourceTitle": zod.string(),
   "provider": zod.enum(['openai', 'anthropic', 'gemini']),
   "model": zod.string(),
@@ -232,6 +253,8 @@ export const ReviewCampaignResponse = zod.object({
 
 
 /**
+ * Retired. Returns 410; reset posts in the current browser tab instead.
+ * @deprecated
  * @summary Delete a generated campaign
  */
 export const DeleteCampaignParams = zod.object({
@@ -242,6 +265,8 @@ export const DeleteCampaignResponse = zod.void()
 
 
 /**
+ * Retired. Returns 410; there is no saved article or post history.
+ * @deprecated
  * @summary Get workflow counts and recent campaign activity
  */
 export const GetDashboardResponse = zod.object({
@@ -251,7 +276,7 @@ export const GetDashboardResponse = zod.object({
   "approvedCount": zod.number().int(),
   "recentCampaigns": zod.array(zod.object({
   "id": zod.number().int(),
-  "sourceId": zod.number().int(),
+  "sourceId": zod.number().int().optional(),
   "sourceTitle": zod.string(),
   "provider": zod.enum(['openai', 'anthropic', 'gemini']),
   "model": zod.string(),

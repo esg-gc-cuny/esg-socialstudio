@@ -1,16 +1,9 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { LoaderCircle } from "lucide-react";
 import {
-  getListCampaignsQueryKey,
-  getListSourcesQueryKey,
-  useCreateSource,
   useExtractArticle,
   useGenerateCampaign,
-  useListCampaigns,
-  useListSources,
-  useReviewCampaign,
 } from "@workspace/api-client-react";
 import type {
   Campaign,
@@ -28,13 +21,8 @@ const platforms = [
 ] as const;
 
 function Dashboard() {
-  const queryClient = useQueryClient();
-  const sourcesQuery = useListSources();
-  const campaignsQuery = useListCampaigns();
-  const createSource = useCreateSource();
   const extractArticle = useExtractArticle();
   const generateCampaign = useGenerateCampaign();
-  const reviewCampaign = useReviewCampaign();
 
   const [inputMode, setInputMode] = useState<"paste" | "link">("paste");
   const [sourceContent, setSourceContent] = useState("");
@@ -42,26 +30,13 @@ function Dashboard() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["linkedin", "facebook", "bluesky", "substack"]);
   const [generateHashtags, setGenerateHashtags] = useState(true);
   const [postsCleared, setPostsCleared] = useState(false);
-  const [activeCampaignId, setActiveCampaignId] = useState<number | null>(null);
+  const [latestCampaign, setLatestCampaign] = useState<Campaign | null>(null);
   const [notice, setNotice] = useState("");
-  const [reviewSavingId, setReviewSavingId] = useState<number | null>(null);
-
-  const sources = sourcesQuery.data ?? [];
-  const campaigns = [...(campaignsQuery.data ?? [])].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
-  );
-  const latestCampaign =
-    campaigns.find((campaign) => campaign.id === activeCampaignId) ?? campaigns[0];
-  const isGenerating = createSource.isPending || extractArticle.isPending || generateCampaign.isPending;
+  const isGenerating = extractArticle.isPending || generateCampaign.isPending;
 
   const notify = (message: string, duration = 2800) => {
     setNotice(message);
     window.setTimeout(() => setNotice(""), duration);
-  };
-
-  const refreshAll = () => {
-    void queryClient.invalidateQueries({ queryKey: getListSourcesQueryKey() });
-    void queryClient.invalidateQueries({ queryKey: getListCampaignsQueryKey() });
   };
 
   const togglePlatform = (id: string) => {
@@ -71,8 +46,10 @@ function Dashboard() {
   };
 
   const resetPosts = () => {
+    setLatestCampaign(null);
+    generateCampaign.reset();
     setPostsCleared(true);
-    notify("Posts cleared from view. Saved campaigns are unchanged.");
+    notify("Posts cleared.");
   };
 
   const scrollToResults = () => {
@@ -80,14 +57,14 @@ function Dashboard() {
   };
 
   const generateForSource = (
-    sourceId: number,
+    source: SourceInput,
     selected: string[],
     shouldGenerateHashtags: boolean,
   ) => {
     generateCampaign.mutate(
       {
         data: {
-          sourceId,
+          source,
           provider: "anthropic",
           platforms: selected as CampaignGenerationInput["platforms"],
           tone: "Inviting publisher voice; sharp, article-grounded hook; clear reason to read; source-supported facts only.",
@@ -96,26 +73,24 @@ function Dashboard() {
       },
       {
         onSuccess: (campaign) => {
-          refreshAll();
           setPostsCleared(false);
-          setActiveCampaignId(campaign.id);
+          setLatestCampaign(campaign);
           notify("Claude posts are ready to copy.");
           window.setTimeout(scrollToResults, 80);
         },
         onError: (error) => {
-          refreshAll();
           const data: unknown = error.data;
           const detail = data && typeof data === "object" &&
             "error" in data && typeof data.error === "string"
             ? data.error
             : "Posts could not be generated. Please try again.";
-          notify(`Article saved. ${detail}`, 12000);
+          notify(detail, 12000);
         },
       },
     );
   };
 
-  const saveAndGenerate = (
+  const prepareAndGenerate = (
     rawTitle: string,
     rawContent: string,
     selected: string[],
@@ -131,23 +106,10 @@ function Dashboard() {
     const title = rawTitle.trim()
       || content.split(/\r?\n/).find((line) => line.trim())?.trim().slice(0, 180)
       || "Research article";
-    const savedSource = sourceUrl
-      ? sources.find((source) => source.sourceUrl === sourceUrl && source.content === content)
-      : sources.find((source) => !source.sourceUrl && source.title === title && source.content === content);
-    if (savedSource) {
-      generateForSource(savedSource.id, selected, shouldGenerateHashtags);
-      return;
-    }
-
-    createSource.mutate(
-      { data: { title, content, ...(sourceUrl ? { sourceUrl } : {}) } },
-      {
-        onSuccess: (source) => {
-          void queryClient.invalidateQueries({ queryKey: getListSourcesQueryKey() });
-          generateForSource(source.id, selected, shouldGenerateHashtags);
-        },
-        onError: () => notify("The article could not be saved. Please try again."),
-      },
+    generateForSource(
+      { title, content, ...(sourceUrl ? { sourceUrl } : {}) },
+      selected,
+      shouldGenerateHashtags,
     );
   };
 
@@ -161,7 +123,7 @@ function Dashboard() {
     const selected = [...selectedPlatforms];
     const shouldGenerateHashtags = generateHashtags;
     if (inputMode === "paste") {
-      saveAndGenerate("", sourceContent, selected, shouldGenerateHashtags);
+      prepareAndGenerate("", sourceContent, selected, shouldGenerateHashtags);
       return;
     }
 
@@ -169,7 +131,7 @@ function Dashboard() {
       { data: { url: articleUrl.trim() } },
       {
         onSuccess: (article) => {
-          saveAndGenerate(
+          prepareAndGenerate(
             article.title,
             article.content,
             selected,
@@ -183,21 +145,10 @@ function Dashboard() {
   };
 
   const handleReview = (campaign: Campaign, update: CampaignReviewUpdate) => {
-    setReviewSavingId(campaign.id);
-    reviewCampaign.mutate(
-      { id: campaign.id, data: update },
-      {
-        onSuccess: () => {
-          refreshAll();
-          notify("Draft edits saved.");
-          setReviewSavingId(null);
-        },
-        onError: () => {
-          notify("Draft edits could not be saved. Your current edits remain on screen.");
-          setReviewSavingId(null);
-        },
-      },
-    );
+    setLatestCampaign((current) => current?.id === campaign.id
+      ? { ...current, ...update, updatedAt: new Date().toISOString() }
+      : current);
+    notify("Edits applied.");
   };
 
   return (
@@ -327,18 +278,18 @@ function Dashboard() {
         <div id="generated-drafts" className="results-area">
           <CampaignPanel
             campaigns={!postsCleared && latestCampaign ? [latestCampaign] : []}
-            isLoading={campaignsQuery.isLoading}
-            error={campaignsQuery.isError}
-            onRetry={() => void campaignsQuery.refetch()}
+            isLoading={false}
+            error={false}
+            onRetry={() => {}}
             onReview={handleReview}
-            savingId={reviewSavingId}
+            savingId={null}
             emptyMessage={postsCleared ? "Posts cleared" : undefined}
             emptyHint={postsCleared ? "Generate posts to create a new set." : undefined}
           />
         </div>
         </div>
 
-        <footer className="simple-tool-footer">Drafts only. Nothing is published or scheduled from this tool.</footer>
+        <footer className="simple-tool-footer">Drafts clear on refresh. Nothing is published automatically.</footer>
       </main>
       {notice && <div className="toast-message" role="status" data-testid="status-notice">{notice}</div>}
     </div>

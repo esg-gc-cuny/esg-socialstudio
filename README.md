@@ -15,14 +15,12 @@ The tool does not publish posts automatically.
 ## Requirements
 
 - Node.js and pnpm
-- PostgreSQL
 - An Anthropic API key
 
 Configure these server-side environment variables:
 
 ```text
 ANTHROPIC_API_KEY
-DATABASE_URL
 ```
 
 Do not commit secret values.
@@ -45,3 +43,6 @@ Review generated posts before using them. Some websites block article extraction
 paste the text instead.
 
 The tool has no sign-in. Protect access before sharing a deployment.
+
+No database is required. Articles and drafts stay in the current tab and clear
+when the page is refreshed.

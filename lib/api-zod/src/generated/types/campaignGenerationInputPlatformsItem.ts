@@ -14,6 +14,4 @@ export const CampaignGenerationInputPlatformsItem = {
   facebook: 'facebook',
   bluesky: 'bluesky',
   substack: 'substack',
-  x: 'x',
-  instagram: 'instagram',
 } as const;

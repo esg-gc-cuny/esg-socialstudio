@@ -147,6 +147,8 @@ export const getListSourcesUrl = () => {
 }
 
 /**
+ * Retired. Returns 410; articles are no longer saved.
+ * @deprecated
  * @summary List research sources
  */
 export const listSources = async ( options?: Parameters<typeof customFetch>[1]): Promise<ContentSource[]> => {
@@ -194,6 +196,7 @@ export type ListSourcesQueryError = ErrorType<unknown>
 
 
 /**
+ * @deprecated
  * @summary List research sources
  */
 
@@ -224,6 +227,8 @@ export const getCreateSourceUrl = () => {
 }
 
 /**
+ * Retired. Returns 410; include source content in the generation request instead.
+ * @deprecated
  * @summary Save a research source
  */
 export const createSource = async (sourceInput: SourceInput, options?: Parameters<typeof customFetch>[1]): Promise<ContentSource> => {
@@ -290,6 +295,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreateSourceMutationVariables = {data: BodyType<SourceInput>}
 
     /**
+ * @deprecated
  * @summary Save a research source
  */
 export const useCreateSource = <TError = ErrorType<unknown>,
@@ -400,6 +406,8 @@ export const getUpdateSourceUrl = (id: number,) => {
 }
 
 /**
+ * Retired. Returns 410; source content stays in the current browser tab.
+ * @deprecated
  * @summary Update a research source
  */
 export const updateSource = async (id: number,
@@ -467,6 +475,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdateSourceMutationVariables = {id: number;data: BodyType<SourceUpdate>}
 
     /**
+ * @deprecated
  * @summary Update a research source
  */
 export const useUpdateSource = <TError = ErrorType<void>,
@@ -489,6 +498,8 @@ export const getDeleteSourceUrl = (id: number,) => {
 }
 
 /**
+ * Retired. Returns 410; existing database records are left untouched.
+ * @deprecated
  * @summary Delete a source and its campaigns
  */
 export const deleteSource = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
@@ -541,6 +552,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteSourceMutationVariables = {id: number}
 
     /**
+ * @deprecated
  * @summary Delete a source and its campaigns
  */
 export const useDeleteSource = <TError = ErrorType<void>,
@@ -563,6 +575,8 @@ export const getListCampaignsUrl = () => {
 }
 
 /**
+ * Retired. Returns 410; drafts are no longer saved on the server.
+ * @deprecated
  * @summary List generated campaigns
  */
 export const listCampaigns = async ( options?: Parameters<typeof customFetch>[1]): Promise<Campaign[]> => {
@@ -610,6 +624,7 @@ export type ListCampaignsQueryError = ErrorType<unknown>
 
 
 /**
+ * @deprecated
  * @summary List generated campaigns
  */
 
@@ -728,6 +743,8 @@ export const getReviewCampaignUrl = (id: number,) => {
 }
 
 /**
+ * Retired. Returns 410; draft edits are applied locally in the browser.
+ * @deprecated
  * @summary Edit draft copy or update its review status
  */
 export const reviewCampaign = async (id: number,
@@ -795,6 +812,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type ReviewCampaignMutationVariables = {id: number;data: BodyType<CampaignReviewUpdate>}
 
     /**
+ * @deprecated
  * @summary Edit draft copy or update its review status
  */
 export const useReviewCampaign = <TError = ErrorType<void>,
@@ -817,6 +835,8 @@ export const getDeleteCampaignUrl = (id: number,) => {
 }
 
 /**
+ * Retired. Returns 410; reset posts in the current browser tab instead.
+ * @deprecated
  * @summary Delete a generated campaign
  */
 export const deleteCampaign = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
@@ -869,6 +889,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeleteCampaignMutationVariables = {id: number}
 
     /**
+ * @deprecated
  * @summary Delete a generated campaign
  */
 export const useDeleteCampaign = <TError = ErrorType<void>,
@@ -891,6 +912,8 @@ export const getGetDashboardUrl = () => {
 }
 
 /**
+ * Retired. Returns 410; there is no saved article or post history.
+ * @deprecated
  * @summary Get workflow counts and recent campaign activity
  */
 export const getDashboard = async ( options?: Parameters<typeof customFetch>[1]): Promise<DashboardSummary> => {
@@ -938,6 +961,7 @@ export type GetDashboardQueryError = ErrorType<unknown>
 
 
 /**
+ * @deprecated
  * @summary Get workflow counts and recent campaign activity
  */
 

@@ -218,7 +218,7 @@ function CampaignCard({
             data-testid={`button-save-draft-${campaign.id}`}
           >
             <Check size={12} />
-            Save edits
+            Apply edits
           </button>
         </div>
       </div>

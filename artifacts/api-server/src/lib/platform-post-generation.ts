@@ -1,4 +1,4 @@
-import type { PlatformDraft } from "@workspace/db";
+import type { PlatformDraft } from "@workspace/api-zod";
 import {
   buildIndependentPlatformPrompt,
   platformEditorialBriefs,

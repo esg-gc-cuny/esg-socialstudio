@@ -29,6 +29,8 @@ paths:
   /sources:
     get:
       operationId: listSources
+      deprecated: true
+      description: Retired. Returns 410; articles are no longer saved.
       tags: [research-social]
       summary: List research sources
       responses:
@@ -42,6 +44,8 @@ paths:
                   $ref: "#/components/schemas/ContentSource"
     post:
       operationId: createSource
+      deprecated: true
+      description: Retired. Returns 410; include source content in the generation request instead.
       tags: [research-social]
       summary: Save a research source
       requestBody:
@@ -84,6 +88,8 @@ paths:
   /sources/{id}:
     patch:
       operationId: updateSource
+      deprecated: true
+      description: Retired. Returns 410; source content stays in the current browser tab.
       tags: [research-social]
       summary: Update a research source
       parameters:
@@ -109,6 +115,8 @@ paths:
           description: Source not found
     delete:
       operationId: deleteSource
+      deprecated: true
+      description: Retired. Returns 410; existing database records are left untouched.
       tags: [research-social]
       summary: Delete a source and its campaigns
       parameters:
@@ -125,6 +133,8 @@ paths:
   /campaigns:
     get:
       operationId: listCampaigns
+      deprecated: true
+      description: Retired. Returns 410; drafts are no longer saved on the server.
       tags: [research-social]
       summary: List generated campaigns
       responses:
@@ -161,6 +171,8 @@ paths:
   /campaigns/{id}:
     patch:
       operationId: reviewCampaign
+      deprecated: true
+      description: Retired. Returns 410; draft edits are applied locally in the browser.
       tags: [research-social]
       summary: Edit draft copy or update its review status
       parameters:
@@ -186,6 +198,8 @@ paths:
           description: Campaign not found
     delete:
       operationId: deleteCampaign
+      deprecated: true
+      description: Retired. Returns 410; reset posts in the current browser tab instead.
       tags: [research-social]
       summary: Delete a generated campaign
       parameters:
@@ -202,6 +216,8 @@ paths:
   /dashboard:
     get:
       operationId: getDashboard
+      deprecated: true
+      description: Retired. Returns 410; there is no saved article or post history.
       tags: [research-social]
       summary: Get workflow counts and recent campaign activity
       responses:
@@ -281,7 +297,7 @@ components:
         characterLimit: { type: integer }
     Campaign:
       type: object
-      required: [id, sourceId, sourceTitle, provider, model, status, tone, platforms, outputs, estimatedCostUsd, createdAt, updatedAt]
+      required: [id, sourceTitle, provider, model, status, tone, platforms, outputs, estimatedCostUsd, createdAt, updatedAt]
       properties:
         id: { type: integer }
         sourceId: { type: integer }
@@ -302,16 +318,18 @@ components:
         updatedAt: { type: string, format: date-time }
     CampaignGenerationInput:
       type: object
-      required: [sourceId, provider, platforms, tone]
+      required: [source, provider, platforms, tone]
       properties:
-        sourceId: { type: integer }
+        source:
+          description: Source text is processed for this request only and is not stored.
+          $ref: "#/components/schemas/SourceInput"
         provider: { type: string, enum: [openai, anthropic, gemini] }
         platforms:
           type: array
           minItems: 1
           items:
             type: string
-            enum: [linkedin, facebook, bluesky, substack, x, instagram]
+            enum: [linkedin, facebook, bluesky, substack]
         tone: { type: string, minLength: 1, maxLength: 120 }
         audience: { type: string, maxLength: 200 }
         campaignGoal: { type: string, maxLength: 200 }

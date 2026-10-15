@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { PlatformDraft } from "@workspace/db";
+import type { PlatformDraft } from "@workspace/api-zod";
 import type { SocialPlatform, EditorialSource } from "../config/platform-editorial-prompts";
 import {
   generateIndependentPosts,
@@ -30,7 +30,7 @@ const modelByProvider: Record<ProviderId, string> = {
 function getAnthropicClient(): Anthropic {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    throw new Error("Anthropic API key is missing. Add ANTHROPIC_API_KEY in Replit Secrets.");
+    throw new Error("Anthropic API key is missing. Add ANTHROPIC_API_KEY to the server environment.");
   }
   return new Anthropic({ apiKey });
 }

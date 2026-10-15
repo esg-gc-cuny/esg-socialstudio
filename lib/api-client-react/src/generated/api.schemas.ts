@@ -95,7 +95,7 @@ export const CampaignStatus = {
 
 export interface Campaign {
   id: number;
-  sourceId: number;
+  sourceId?: number;
   sourceTitle: string;
   provider: CampaignProvider;
   model: string;
@@ -125,12 +125,11 @@ export const CampaignGenerationInputPlatformsItem = {
   facebook: 'facebook',
   bluesky: 'bluesky',
   substack: 'substack',
-  x: 'x',
-  instagram: 'instagram',
 } as const;
 
 export interface CampaignGenerationInput {
-  sourceId: number;
+  /** Source text is processed for this request only and is not stored. */
+  source: SourceInput;
   provider: CampaignGenerationInputProvider;
   /** @minItems 1 */
   platforms: CampaignGenerationInputPlatformsItem[];
