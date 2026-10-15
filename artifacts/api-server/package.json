@@ -7,7 +7,8 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test:social-posts": "esbuild src/lib/platform-post-generation.test.ts --bundle --platform=node --format=esm --outfile=/tmp/esg-social-post-tests.mjs && node --test /tmp/esg-social-post-tests.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.133.0",

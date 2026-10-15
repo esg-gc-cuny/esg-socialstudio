@@ -41,6 +41,12 @@ For ESG Social Studio, use one selected, platform-specific teaser per platform. 
 
 **How to apply:** Keep article analysis and alternate drafts out of the current UI unless requested. Preserve the full article-link line in the post and copy action. Hashtags are enabled by default but user-controllable; when enabled, add distinct article-specific tags up to platform limits, dropping tags before context or the final link. With the toggle off, return none. Prioritize a named subject plus concrete detail on Bluesky and Substack.
 
+Write each platform independently for its audience, with its own tone, length, hook, invitation, and hashtag brief. Do not make a generic post and repair its voice afterward with a stock author/invitation prefix.
+
+**Why:** The user explicitly requested four separate prompts and requests after repeated shared-prompt revisions and templated invitations still did not sound like inviting social posts.
+
+**How to apply:** Preserve each platform's native editorial voice through validation. Questions remain optional. Budget Bluesky's full link first and combine context and invitation into a compact sentence when necessary.
+
 Use a mix of recognizable subject hashtags and specific article-grounded tags where appropriate, rather than obscure compounds or generic promotional slogans.
 
 **Why:** The user requested as many relevant, source-grounded hashtags as fit, rather than an arbitrary 1–2 tag target.
