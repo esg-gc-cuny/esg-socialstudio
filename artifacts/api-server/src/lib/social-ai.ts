@@ -415,6 +415,23 @@ function normalizeEvidenceText(text: string): string {
     .trim();
 }
 
+function inviteReaderToExplore(text: string, authorByline: string | null): string {
+  if (!authorByline) return text;
+  const escapedByline = authorByline.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const authorStatement = new RegExp(
+    `^${escapedByline}\\s+(?:examine[sd]?|explores?|traces?|analy[sz]es?|considers?|explains?|looks? at)\\s+(.+?)[.!]$`,
+    "i",
+  );
+  let invited = false;
+  return splitCompleteSentences(text).map((sentence) => {
+    if (invited) return sentence;
+    const match = sentence.match(authorStatement);
+    if (!match) return sentence;
+    invited = true;
+    return `With ${authorByline}, explore ${match[1]}.`;
+  }).join(" ");
+}
+
 function sourceContainsExcerpt(source: string, excerpt: string, minimumWords = 2): boolean {
   const normalizedExcerpt = normalizeEvidenceText(excerpt);
   if (
@@ -1268,13 +1285,15 @@ Review and improve each proposed draft as an experienced social editor. Remove o
 
 Use a question hook only when the source genuinely explores the question and asking it makes the post more natural and inviting for that platform. A question is an option, not a requirement or a default for all platforms. Keep a strong declarative opening when a question would be forced, generic, or imply something the source does not support. Never append a question merely to solicit engagement.
 
-The application adds “Read the full article on our website” with the link as the final call to action. Do not force a second invitation sentence or repeat that CTA. Use the body for the hook and, when useful, a concise article-specific detail or verified author attribution. A second body sentence may invite further reading only when it adds a concrete, source-supported reason and sounds natural. Preserve the platform's native voice and the publisher's third-person perspective. Cut generic filler and unsupported claims. Do not use first-person or second-person pronouns, emojis, em dashes, en dashes, or double hyphens.
+Preserve the draft's natural invitation while checking its facts. Do not flatten “Explore how…” or “Discover why…” into a detached “[names] examine…” statement. If the draft lacks an invitation, rewrite its author/context sentence to invite exploration of that same supported subject, instead of adding more findings. Imperative verbs such as “Explore”, “Discover”, and “Read” are allowed; the ban on first- and second-person pronouns does not prohibit an invitation.
+
+The application adds “Read the full article on our website” with the link at the end, but the body must feel like a publisher inviting followers to discover the full explanation, not simply stating findings. After the hook, weave a natural invitation into the author/context sentence. Prefer an accurate author-led reader promise such as “Explore how [verified names] trace [specific supported relationship]” over a detached “[names] examine [topic]” report. Name the specific question or insight readers can explore, without giving away its complete answer. Do not force a stock phrase, append a redundant generic CTA, or manufacture stakes. On Bluesky, a short integrated invitation can serve as the author/context sentence; on longer platforms, give a little more connected context. Preserve professional third-person publisher voice. Cut generic filler and unsupported claims. Do not use first-person or second-person pronouns, emojis, em dashes, en dashes, or double hyphens.
 
 Write as the publisher's professional social media marketing manager inviting followers to continue reading, not as a detached reviewer. Never use “the article”, “this article”, or “the authors” in the body. Name verified authors with an accurate verb, or discuss the subject directly. The application-added “Read the full article” CTA is the sole exception. Keep the teaser selective: a source-supported hook, enough context to understand its significance, and at most one supporting detail. Do not enumerate sectors, statistics, explanations, or conclusions. Leave the reasoning and full findings for readers to discover. LinkedIn can develop the context in two or three connected sentences; Facebook should be accessible and conversational; Bluesky must be compact but understandable; Substack should be thoughtful without becoming a miniature summary.
 
 When the article has a verified byline, include the author or authors naturally in the post when platform space allows. Use the exact name and an accurate verb such as examines, explains, argues, suggests, or finds; never strengthen tentative language into a proven conclusion. Do not make the article itself the speaker. If no clear byline is present, state the supported point directly without inventing attribution. Keep attribution natural and brief.
 
-Return one or more complete sentences, up to the platform's sentence limit. The first sentence must have role "hook"; any remaining sentence must have role "context". The fixed final link line is the call to action, so do not add a generic invitation merely to fill space. Pair every sentence with one exact excerpt that directly supports it. Evidence is internal validation only and must not appear in post text. Return hashtags as objects paired with exact excerpts that support each tag. Use only article-named people, places, institutions, industries, or topics. Remove tags that rely on inferred or outside context. ${context.generateHashtags ? "Include as many distinct, relevant tags as fit, up to the platform's maximum; the example array shows capacity, not a required number." : "Return no hashtags."}
+Return one or more complete sentences, up to the platform's sentence limit. The first sentence must have role "hook"; any remaining sentence must have role "context". Make the body a coherent, inviting teaser, not a summary followed by a link. Integrate an article-specific invitation into the context when space permits, without generic filler. Pair every sentence with one exact excerpt that directly supports its factual subject and relationship; an invitation's evidence must support the promised topic, not the imperative verb. Evidence is internal validation only and must not appear in post text. Return hashtags as objects paired with exact excerpts that support each tag. Use only article-named people, places, institutions, industries, or topics. Remove tags that rely on inferred or outside context. ${context.generateHashtags ? "Include as many distinct, relevant tags as fit, up to the platform's maximum; the example array shows capacity, not a required number." : "Return no hashtags."}
 
 ${context.generateHashtags ? "For discovery, include as many distinct, useful hashtags as the article and available space justify, up to each platform's maximum. Do not impose an arbitrary 1–2 tag target or pad with weak tags. Mix recognizable subject hashtags with specific article-grounded location, industry, or policy tags. Prefer standard readable topic names and common abbreviations over invented compound tags; standard hashtag wording may differ from the article's literal words, but its topic must be explicitly discussed and supported by the paired excerpt. Rank the most useful tags first so they survive length limits. Avoid near-duplicate tags, generic campaign slogans, unrelated popular tags, and unsupported claims about trending status or reach. Preserve the hook, context, and final link before adding tags." : "Do not add hashtags even if the proposed drafts contain them."}
 
@@ -1556,10 +1575,11 @@ export async function generatePlatformDrafts(
   return {
     model,
     drafts: reviewed.drafts.map((draft) => {
-      const body = normalizeAuthorAttribution(
+      const attributedBody = normalizeAuthorAttribution(
         withoutAppendedCta(draft.content, context.sourceUrl),
         analysis.author_byline,
       );
+      const body = inviteReaderToExplore(attributedBody, analysis.author_byline);
       const fullText = copyText(body, draft.hashtags, context.sourceUrl);
       if (fullText.length > draft.characterLimit) return draft;
       return {

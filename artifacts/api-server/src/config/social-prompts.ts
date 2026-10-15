@@ -60,7 +60,7 @@ export const platformRules: Record<
     style:
       "Polished, credible, and insight-led. Sound like an informed organizational publisher opening a useful professional conversation, not a paper abstract or a corporate announcement. Use clear economic or policy language and up to five relevant hashtags when they improve discovery.",
     structure:
-      "Write one or two connected teaser sentences before the final link. Open with a specific, source-supported contrast or question, not a bare statistic. Give at most one useful detail and attribute the analysis to the verified authors when it fits. Do not force a second invitation sentence; the full-article link is the call to action.",
+      "Write two or three connected teaser sentences before the final link. Open with a specific, source-supported contrast or question, not a bare statistic. Give at most one useful detail. Integrate a professional invitation to explore a specific aspect of the verified authors' work; do not merely list findings or append a generic slogan.",
     maxTeaserSentences: 3,
   },
   facebook: {
@@ -73,7 +73,7 @@ export const platformRules: Record<
     style:
       "Warm, accessible, and community-minded. Explain the article's specific question or finding in plain language and a natural conversational rhythm. Avoid academic jargon, influencer slang, and corporate announcements. Use up to three relevant hashtags when useful.",
     structure:
-      "Write one or two connected sentences in plain language. Open with a human, article-specific contrast or question that makes a reader pause. Attribute the work to its verified authors and give just enough context. The final article link is the call to action; do not add a generic 'learn more' sentence.",
+      "Write one or two connected sentences in plain language. Open with a human, source-specific contrast or question that makes a reader pause. Follow with a warm, specific invitation that naturally attributes the work to verified authors and gives just enough context. Avoid generic 'learn more' filler.",
     maxTeaserSentences: 3,
   },
   bluesky: {
@@ -86,7 +86,7 @@ export const platformRules: Record<
     style:
       "Compact, direct, and conversational, like a sharp observation shared with an informed community. Use a crisp contrast or genuine question, not a local-news headline or report-style summary. Keep the hook under about 75 characters; a second sentence may add a specific article detail or author attribution when it fits. Avoid title restatements, institutional phrasing, academic setup, and clickbait. Use no emojis, sarcasm, irony, or rhetorical reversals. Add relevant hashtags only when they fit without crowding the hook or link. Keep the complete post, including its link, within 300 characters.",
     structure:
-      "Write one or two short, connected sentences before the link and aim for a teaser body of about 120–145 characters total when the article supports it. Sentence one is a crisp, source-supported contrast or question. A second sentence may name the authors and add context if it fits naturally. Preserve the hook and full link; drop hashtags before cutting either. Never invent a tension if the article does not support one.",
+      "Write one or two short, connected sentences before the link and aim for a teaser body of about 120–145 characters total when the source supports it. Use a crisp supported hook and a compact invitation to explore its specific question, integrating verified authors when space permits. Preserve context and the full link; drop hashtags first. Never invent tension.",
     maxTeaserSentences: 2,
   },
   substack: {
@@ -99,7 +99,7 @@ export const platformRules: Record<
     style:
       "Reflective, editorial, and idea-led. Give an interested reader more context than a short-feed post, while keeping the voice measured and readable rather than academic or promotional. Use up to five relevant topic hashtags when they improve discovery.",
     structure:
-      "Write two or three connected sentences. Start with a compelling, source-supported tension or question, not an abstract topic announcement. Use one concrete detail to orient the reader and attribute the analysis to its verified authors. The final article link is the call to action; do not force a separate invitation sentence. Do not turn the note into a full summary.",
+      "Write two or three connected sentences. Start with a compelling, source-supported tension or question, not an abstract topic announcement. Use one concrete detail to orient the reader, then invite exploration of the verified authors' argument or evidence without revealing the whole explanation. Make the invitation part of the thought, not a detached slogan or full summary.",
     maxTeaserSentences: 3,
   },
   x: {
@@ -280,18 +280,18 @@ export function buildPlatformPrompt(input: PlatformPromptInput): string {
   "platform": "bluesky",
   "recommended_index": 0,
   "variants": [
-    { "format": "single", "angle": "<supported hook angle>", "content": "<one complete, source-grounded hook sentence>", "invitation": "", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} },
-    { "format": "single", "angle": "<different supported hook angle>", "content": "<a distinct, complete hook sentence>", "invitation": "", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} },
-    { "format": "single", "angle": "<another supported hook angle>", "content": "<a third distinct hook, not a title restatement or summary>", "invitation": "", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} }
+    { "format": "single", "angle": "<supported hook angle>", "content": "<short source-grounded hook leaving room for the invitation>", "invitation": "<compact invitation to explore this specific question, with verified authors if space permits>", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} },
+    { "format": "single", "angle": "<different supported hook angle>", "content": "<a distinct, complete hook sentence>", "invitation": "<natural invitation connected to this hook, not a neutral statement>", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} },
+    { "format": "single", "angle": "<another supported hook angle>", "content": "<a third distinct hook, not a title restatement or summary>", "invitation": "<brief invitation with a specific supported reason to continue>", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} }
   ]
 }`
     : `{
   "platform": "${input.platform}",
   "recommended_index": 0,
   "variants": [
-    { "format": "single", "angle": "<supported angle>", "content": "<complete opening with a named subject and concrete article detail>", "invitation": "", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} },
-    { "format": "single", "angle": "<different supported angle>", "content": "<a distinct, accurate opening with enough context>", "invitation": "", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} },
-    { "format": "single", "angle": "<another supported angle>", "content": "<a third distinct, source-grounded opening>", "invitation": "", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} }
+    { "format": "single", "angle": "<supported angle>", "content": "<complete hook and just enough connected context>", "invitation": "<natural invitation to explore a specific aspect of the verified authors' work>", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} },
+    { "format": "single", "angle": "<different supported angle>", "content": "<a distinct, accurate opening with enough context>", "invitation": "<inviting continuation of this hook, not merely authors examine topic>", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} },
+    { "format": "single", "angle": "<another supported angle>", "content": "<a third distinct, source-grounded opening>", "invitation": "<specific invitation preserving curiosity without revealing all findings>", "supporting_evidence": ${evidenceExample}, "hashtags": ${hashtagExample}, "hashtag_evidence": ${hashtagEvidenceExample} }
   ]
 }`;
 
@@ -309,10 +309,10 @@ Editorial rules:
 - Keep the tease honest. State what the article actually contributes, but leave room for the full article's reasoning, evidence, and nuance. Do not invent a mystery, exaggerate a result, or hide the article's subject just to create a click.
 - Say why the subject matters only when the article itself supports that relevance. Otherwise explain what the authors examine and what question the source leaves open; do not add outside policy, economic, or audience implications.
 - Use the article's precise terms and relationships. Do not replace specifics with a broad paraphrase, attach an unrelated fact to a question, or present correlation as causation.
-- Write the post as one coherent thought. The content field should establish the subject and context. An invitation is optional and should only be included when it adds a concrete, source-supported reason to read without repeating the final link CTA.
+- Write a publisher's invitation, not a report of findings. Connect the hook to a concrete reason to continue reading: what the verified authors help readers explore or understand. Weave that invitation into the author/context sentence, rather than adding a detached marketing slogan. Natural frames include “Explore how [verified names] trace [specific supported relationship]” or “For a closer look at [supported question], follow [verified names]' analysis.” Vary wording to suit the source and platform; these are structural examples, not phrases to repeat verbatim. Keep the full explanation for the linked piece.
 - When the source gives a verified byline, include the author or authors naturally in the post when the platform length allows. Pair their exact names with an accurate verb and specific subject: examines, explains, argues, suggests, finds, or shows only when that verb matches the article. Do not say “the article says/states/shows.” Never invent or alter a name, and preserve uncertainty.
 - Never use “the article”, “this article”, or generic “the authors” in the generated body. Write from the publisher's account as a professional social media marketing manager inviting followers to read: a specific hook, connected context, and a reason to discover the full explanation. Use verified names or state the subject directly. The application-added “Read the full article” CTA is the only exception. Do not reveal the full argument or list findings to fill space.
-- The application adds “Read the full article on our website” and the article link as the final CTA. Do not force a second CTA or repeat that line in the generated text. If an extra body invitation adds a specific, article-supported reason to read, keep it natural; otherwise leave the invitation field empty.
+- The application adds “Read the full article on our website” and the link at the end. That link alone does not make a neutral summary inviting. The teaser itself should warmly invite discovery of a specific source-supported question or insight. Include that invitation in content or the invitation field, not both. Avoid repetitive “See which topics the authors examine” filler and do not duplicate the final link line.
 - Use only facts, numbers, names, relationships, and implications supported by the article. For every sentence, return one exact, contiguous excerpt in supporting_evidence that substantiates the sentence's actual claim and relationship, not merely a related keyword or neighboring fact. If the evidence is ambiguous, narrow or remove the claim.
 - For every hashtag, return an exact article excerpt that supports it in hashtag_evidence, in the same order. Hashtags must name a person, place, institution, industry, or topic explicitly present in the article. Do not use inferred categories or outside context.
 - Before returning, check every number, date, named entity, comparison, causal link, and implication against the article. Remove anything unsupported rather than filling gaps with general knowledge.
