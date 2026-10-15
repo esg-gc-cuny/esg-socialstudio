@@ -41,6 +41,7 @@ function Dashboard() {
   const [articleUrl, setArticleUrl] = useState("");
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["linkedin", "facebook", "bluesky", "substack"]);
   const [generateHashtags, setGenerateHashtags] = useState(true);
+  const [postsCleared, setPostsCleared] = useState(false);
   const [activeCampaignId, setActiveCampaignId] = useState<number | null>(null);
   const [notice, setNotice] = useState("");
   const [reviewSavingId, setReviewSavingId] = useState<number | null>(null);
@@ -69,12 +70,9 @@ function Dashboard() {
       : [...current, id]);
   };
 
-  const resetFields = () => {
-    setInputMode("paste");
-    setSourceContent("");
-    setArticleUrl("");
-    setSelectedPlatforms(platforms.map((platform) => platform.id));
-    setGenerateHashtags(true);
+  const resetPosts = () => {
+    setPostsCleared(true);
+    notify("Posts cleared from view. Saved campaigns are unchanged.");
   };
 
   const scrollToResults = () => {
@@ -99,6 +97,7 @@ function Dashboard() {
       {
         onSuccess: (campaign) => {
           refreshAll();
+          setPostsCleared(false);
           setActiveCampaignId(campaign.id);
           notify("Claude posts are ready to copy.");
           window.setTimeout(scrollToResults, 80);
@@ -301,11 +300,11 @@ function Dashboard() {
               <button
                 type="button"
                 className="button button-quiet"
-                onClick={resetFields}
+                onClick={resetPosts}
                 disabled={isGenerating}
-                data-testid="button-reset-fields"
+                data-testid="button-reset-posts"
               >
-                Reset fields
+                Reset posts
               </button>
               <button
                 type="submit"
@@ -322,12 +321,14 @@ function Dashboard() {
 
         <div id="generated-drafts" className="results-area">
           <CampaignPanel
-            campaigns={latestCampaign ? [latestCampaign] : []}
+            campaigns={!postsCleared && latestCampaign ? [latestCampaign] : []}
             isLoading={campaignsQuery.isLoading}
             error={campaignsQuery.isError}
             onRetry={() => void campaignsQuery.refetch()}
             onReview={handleReview}
             savingId={reviewSavingId}
+            emptyMessage={postsCleared ? "Posts cleared" : undefined}
+            emptyHint={postsCleared ? "Generate posts to create a new set." : undefined}
           />
         </div>
         </div>
