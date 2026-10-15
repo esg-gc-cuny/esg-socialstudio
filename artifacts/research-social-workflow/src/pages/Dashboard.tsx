@@ -90,7 +90,7 @@ function Dashboard() {
           sourceId,
           provider: "anthropic",
           platforms: selected as CampaignGenerationInput["platforms"],
-          tone: "Match the article's voice; write a concise teaser that invites readers to continue",
+          tone: "Inviting publisher voice; sharp, article-grounded hook; clear reason to read; source-supported facts only.",
           generateHashtags: shouldGenerateHashtags,
         },
       },

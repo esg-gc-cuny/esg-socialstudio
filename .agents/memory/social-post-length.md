@@ -17,11 +17,11 @@ For attribution, use the verified author's name with an accurate verb instead of
 
 **How to apply:** Use verbs such as explains, examines, argues, or suggests only when accurate to the source. Do not force attribution into every sentence or invent a byline.
 
-Join the hook and article invitation into one coherent paragraph; keep optional platform-appropriate hashtags and the final article CTA in the same copyable post. When a source URL is available, put hashtags before the final line: “Read the full article on our website: [URL].”
+Keep the hook and concise context in one coherent teaser. The fixed full-article link is the required CTA; add another body invitation only when it gives a specific, source-supported reason to continue. Keep optional platform-appropriate hashtags and the final CTA in the same copyable post.
 
-**Why:** Character targets, especially posts with a long article URL, can otherwise leave a dangling phrase that reads like an error.
+**Why:** Requiring a second invitation sentence produced repetitive filler and could block generation even though the full-article CTA was already present.
 
-**How to apply:** When generating or postprocessing social copy, budget the final CTA and hashtags first, then keep complete hook sentences within the remaining space. Use a natural, article-specific transition; include a verified byline when it fits; add hashtags only when useful on that platform. Keep Bluesky especially concise and inspect the final copied text.
+**How to apply:** Budget the final CTA and hashtags first, then use complete, platform-sized sentences for the hook and context. Include a verified byline when it fits; add another invitation only if it is specific and natural. Keep Bluesky especially concise and inspect the final copied text.
 
 For ESG Social Studio, use one selected, platform-specific teaser per platform. Bluesky and Substack need enough standalone context to name the subject, ground it in a concrete article detail, and make the open question clear. A Bluesky opener must be a real source-supported hook, such as a meaningful tension, contrast, specific detail, or genuine open question, not just a topic restatement or compressed summary. If no true tension exists, lead with the sharpest supported observation rather than inventing one. On Bluesky, drop the byline and optional hashtags before cutting context to fit the link. Never invent facts or author names; keep the article's explanation and conclusions for the reader to discover.
 
