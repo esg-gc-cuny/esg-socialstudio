@@ -1,6 +1,4 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { ai } from "@workspace/integrations-gemini-ai";
-import { openai } from "@workspace/integrations-openai-ai-server";
 import type { PlatformDraft } from "@workspace/db";
 import type { SocialPlatform, EditorialSource } from "../config/platform-editorial-prompts";
 import {
@@ -45,6 +43,7 @@ async function requestModelText(
 ): Promise<EditorialModelResponse> {
   const estimatedInputTokens = Math.ceil(prompt.length / 4);
   if (provider === "openai") {
+    const { openai } = await import("@workspace/integrations-openai-ai-server");
     const response = await openai.chat.completions.create({
       model,
       max_completion_tokens: 4096,
@@ -75,6 +74,7 @@ async function requestModelText(
       outputTokens: response.usage.output_tokens ?? Math.ceil(text.length / 4),
     };
   }
+  const { ai } = await import("@workspace/integrations-gemini-ai");
   const response = await ai.models.generateContent({
     model,
     contents: [{ role: "user", parts: [{ text: prompt }] }],
