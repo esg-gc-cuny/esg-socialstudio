@@ -203,3 +203,46 @@ test("related-post footers cannot supply evidence or dates for the selected arti
     return { text: JSON.stringify(response()), inputTokens: 1, outputTokens: 1 };
   });
 });
+
+test("unsupported election years are removed automatically without a repair request", async () => {
+  const electionSource = {
+    ...source,
+    title: "The Election",
+    content: `${byline}\nEconomic conditions mattered in the election.`,
+  };
+  let calls = 0;
+  const result = await generateIndependentPosts({ ...electionSource, platforms: ["facebook"] }, async () => {
+    calls++;
+    const data = response();
+    data.sentences[0] = {
+      role: "hook", text: "Why did economic conditions matter in the 2024 election?",
+      evidence: ["Economic conditions mattered in the election."],
+    };
+    data.sentences[1].text = "Explore Ada Reed and Ben Orr's explanation of the election.";
+    data.sentences[1].evidence = ["Economic conditions mattered in the election."];
+    data.hashtags = [];
+    return { text: JSON.stringify(data), inputTokens: 1, outputTokens: 1 };
+  });
+  assert.equal(calls, 1);
+  assert.match(result.drafts[0].content, /in the election\?/);
+  assert.ok(!result.drafts[0].content.includes("2024"));
+});
+
+test("year correction preserves supported dates and does not delete other unsupported claims", () => {
+  const electionSource = { ...source, content: `${source.content}\nEconomic conditions mattered in the election.` };
+  for (const [input, expected] of [
+    ["The 2024 presidential election raised questions.", "The presidential election raised questions."],
+    ["The election of 2024 raised questions.", "The election raised questions."],
+    ["2024 elections raised questions.", "Elections raised questions."],
+    ["The 2020 election raised questions.", "The 2020 election raised questions."],
+  ]) {
+    const data = response();
+    data.sentences[0].text = input;
+    assert.ok(parseIndependentPost(JSON.stringify(data), "facebook", electionSource).content.startsWith(expected));
+  }
+  const data = response();
+  data.sentences[0].text = "Prices rose by 99 percent during the 2024 election.";
+  assert.throws(() => parseIndependentPost(JSON.stringify(data), "facebook", electionSource), /Numeric value\(s\) 99/);
+  data.sentences[0].text = "Employment changed in 2024.";
+  assert.throws(() => parseIndependentPost(JSON.stringify(data), "facebook", electionSource), /Numeric value\(s\) 2024/);
+});

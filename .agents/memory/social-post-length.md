@@ -53,6 +53,12 @@ Invitation quality belongs in editorial instructions, not a narrow required-verb
 
 **How to apply:** Keep source-evidence, numeric grounding, author, perspective, and length checks. Give repair requests specific issues and put corrective instructions after the invalid draft so they are not overshadowed by it.
 
+An unsupported year attached to an election reference may be omitted automatically, leaving “the election” rather than blocking generation.
+
+**Why:** The user approved this correction after an inferred election year repeatedly blocked Facebook drafts.
+
+**How to apply:** Omit only the unsupported election-year modifier. Preserve source-supported years and continue rejecting other unsupported statistics or substantive date claims.
+
 Use a mix of recognizable subject hashtags and specific article-grounded tags where appropriate, rather than obscure compounds or generic promotional slogans.
 
 **Why:** The user requested as many relevant, source-grounded hashtags as fit, rather than an arbitrary 1–2 tag target.

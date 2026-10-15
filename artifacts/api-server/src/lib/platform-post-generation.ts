@@ -43,6 +43,22 @@ function unsupportedNumbers(source: string, sentence: string): number[] {
   return [...new Set(numbers(sentence).filter((number) => !allowed.has(number)))];
 }
 
+function removeInferredElectionYear(source: string, sentence: string): string {
+  if (!/\belections?\b/i.test(source)) return sentence;
+  const unsupported = new Set(unsupportedNumbers(source, sentence));
+  const withoutPrefix = sentence.replace(
+    /(?<![$£€\d.,])\b((?:19|20)\d{2})\s+((?:(?:U\.S\.|US|American|presidential|general|national)\s+){0,3}elections?)\b/gi,
+    (match, year: string, subject: string, offset: number) => {
+      if (!unsupported.has(Number(year))) return match;
+      return offset === 0 ? subject.charAt(0).toUpperCase() + subject.slice(1) : subject;
+    },
+  );
+  return withoutPrefix.replace(
+    /\b(elections?)\s+(?:of|in)\s+((?:19|20)\d{2})\b(?!\s*(?:and|or|to)\b|\s*[-–])/gi,
+    (match, subject: string, year: string) => unsupported.has(Number(year)) ? subject : match,
+  );
+}
+
 function supportedTag(tag: string, evidence: string): boolean {
   const topic = normalized(tag.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^#/, ""));
   const quote = normalized(evidence);
@@ -86,7 +102,7 @@ export function parseIndependentPost(
   }
   const sentences: Sentence[] = data.sentences.map((entry, index) => {
     if (!record(entry)) throw new Error(`Sentence ${index + 1} is invalid.`);
-    const sentence = text(entry.text, `Sentence ${index + 1}`);
+    const sentence = removeInferredElectionYear(article, text(entry.text, `Sentence ${index + 1}`));
     if (!["hook", "context", "invitation"].includes(String(entry.role))) {
       throw new Error("Sentence roles must be hook, context, or invitation.");
     }
