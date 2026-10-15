@@ -81,7 +81,7 @@ export const platformRules: Record<
     minHashtags: 0,
     maxHashtags: 3,
     style:
-      "Compact, direct, and conversational, like a sharp observation shared with an informed community. Name the subject immediately; avoid institutional phrasing, academic setup, and clickbait. Use no emojis, sarcasm, irony, or rhetorical reversals. Keep the link and one or two specific hashtags only if they fit without crowding the hook. Return one single-post option and one 2–3-post thread option. Keep every individual post, including a link when present, within 300 characters.",
+      "Compact, direct, and conversational, like a sharp observation shared with an informed community. Name the subject immediately; avoid institutional phrasing, academic setup, and clickbait. Use no emojis, sarcasm, irony, or rhetorical reversals. Add as many distinct, relevant hashtags as fit, up to the platform limit, without crowding the hook or link. Return one single-post option and one 2–3-post thread option. Keep every individual post, including a link when present, within 300 characters.",
     structure:
       "The single post uses one or two short sentences: name the topic, add one source-grounded detail or tension, and leave an implication open. Prefer a crisp question or tension statement. If the full link takes space, drop optional hashtags before useful context. The final link line is the invitation.",
     maxTeaserSentences: 2,
@@ -222,7 +222,9 @@ export function buildPlatformPrompt(input: PlatformPromptInput): string {
   const isLinkedIn = input.platform === "linkedin";
   const hashtagLimit = input.generateHashtags ? rules.maxHashtags : 0;
   const hashtagExample = hashtagLimit > 0
-    ? `["#SpecificTopic", "#RelatedTopic"]`
+    ? JSON.stringify(
+        Array.from({ length: hashtagLimit }, (_, index) => `#RelevantTopic${index + 1}`),
+      )
     : "[]";
   const evidenceExample = isBluesky
     ? `["<verbatim article excerpt supporting sentence 1>", "<verbatim article excerpt supporting sentence 2>"]`
@@ -232,10 +234,15 @@ export function buildPlatformPrompt(input: PlatformPromptInput): string {
         ? `["<verbatim article excerpt supporting sentence 1>", "<verbatim article excerpt supporting sentence 2>", "<verbatim article excerpt supporting sentence 3>", "<verbatim article excerpt supporting invitation>"]`
         : `["<verbatim article excerpt supporting sentence 1>", "<verbatim article excerpt supporting sentence 2>", "<verbatim article excerpt supporting invitation>"]`;
   const hashtagEvidenceExample = hashtagLimit > 0
-    ? `["<verbatim article excerpt supporting hashtag 1>", "<verbatim article excerpt supporting hashtag 2>"]`
+    ? JSON.stringify(
+        Array.from(
+          { length: hashtagLimit },
+          (_, index) => `<verbatim article excerpt supporting hashtag ${index + 1}>`,
+        ),
+      )
     : "[]";
   const hashtagInstructions = input.generateHashtags
-    ? `Include useful topic hashtags where they fit after the complete hook and link. Aim for 3–5 on LinkedIn and Substack, 1–3 on Facebook, and 1–2 on Bluesky when space permits, never exceeding ${hashtagLimit} for this platform. Mix recognizable subject tags with more specific location, industry, policy, or subject tags directly grounded in the article. Prefer established, readable topic names over obscure invented combinations. Standard hashtag forms and common abbreviations are allowed for topics explicitly discussed in the source; they do not have to copy its wording literally. Avoid overlapping synonyms, generic promotional slogans, unrelated popular tags, and claims that tags are trending or guaranteed to increase reach. Do not pad to reach a number. Put tags only in the hashtags array, and prioritize context and the article link if space is tight.`
+    ? `Include as many distinct, genuinely useful topic hashtags as fit after the complete hook and link, up to ${hashtagLimit} for this platform. There is no fixed target count; for Bluesky, include up to three when they fit without crowding the context or link. Mix recognizable subject tags with specific location, industry, or policy tags explicitly grounded in the article. Prefer established, readable topic names over obscure invented combinations. Standard hashtag forms and common abbreviations are allowed for topics explicitly discussed in the source; they do not have to copy its wording literally. Avoid overlapping synonyms, generic promotional slogans, unrelated popular tags, and claims that tags are trending or guaranteed to increase reach. Do not pad. Put tags only in the hashtags array, and prioritize context and the article link if space is tight.`
     : `Do not generate hashtags. Return an empty hashtags array.`;
   const ctaLine = input.sourceUrl
     ? `Read the full article on our website: ${input.sourceUrl}`
@@ -287,7 +294,9 @@ Editorial rules:
 - Make the post sound like a human editor who understands the article, not generic marketing copy.
 - Open with a strong, article-specific hook drawn from hook_angles or best_details. A surprising result, contrast, consequence, or unresolved tension is stronger than a bare statistic.
 - Tease, do not summarize. Give enough context for someone unfamiliar with the article to understand its subject and why it matters, then leave one meaningful question unresolved. Do not reveal the full conclusion or list findings, benefits, risks, methods, categories, or recommendations.
-- The first sentence in the content field must work as a hook: a specific, source-grounded question or an arresting fact or contrast that leaves an important implication unresolved. Do not open with a bare statistic, article announcement, or generic question. Bluesky may use one brief tension statement instead of a question.
+- Make the hook self-contained: name the article's subject and pair it with one concrete source detail, contrast, or unresolved tension. Then show why that detail matters or ask a specific question it raises. A question by itself is not enough context.
+- The first sentence in the content field must work as this hook. Do not open with a bare statistic, article announcement, or generic question. Bluesky may use one brief tension statement instead of a question, but it still needs the subject and a concrete detail.
+- Every sentence must add article-specific context, explain a relevant stake, attribute a source-grounded point, or deepen the open question. Cut generic filler such as “this raises important questions,” “the issue matters,” or “a closer look reveals.” Do not pad to hit the length target.
 - Name the economic subject or article-specific detail in the hook itself. Never open with a context-free reference such as “What is driving that reversal?” or “Why does this matter?”.
 - Build a curiosity gap: stop before the article answers that question. The invitation should make tapping feel worthwhile by pointing to a specific, surprising connection or unanswered implication, without giving that answer away.
 - Each single-post variant has two internal fields: content is the teaser; invitation continues the same idea in one concise sentence. The application joins them with a single space so the post reads as one coherent paragraph, followed by optional hashtags and the final link line. Do not make the invitation a separate announcement.

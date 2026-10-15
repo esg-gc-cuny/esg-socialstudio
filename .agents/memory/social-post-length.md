@@ -7,6 +7,10 @@ Never fit a social teaser by cutting in the middle of a sentence. Prefer complet
 
 Start with a topic-specific teaser, not a generic announcement. Write in the publisher's third-person voice and integrate a verified author naturally when it strengthens the post, but do not force a fixed opening or byline. “Our” is allowed in natural publisher phrasing and the final CTA; avoid first-person singular, emojis, dash punctuation, and unsupported audience claims. Give enough context to create curiosity without summarizing the full article.
 
+**Why:** The user asked for the hook to carry enough article context and not rely on filler.
+
+**How to apply:** Name the subject and include a concrete source-grounded detail, contrast, or open question. Every sentence should add context, stakes, attribution, or curiosity; cut generic filler and do not pad for length.
+
 For attribution, use the verified author's name with an accurate verb instead of “the article states/says.” Preserve the source's level of certainty; if there is no verified author, state the supported point directly.
 
 **Why:** The user requested author-led attribution rather than treating the article as the speaker.
@@ -27,6 +31,6 @@ For ESG Social Studio, use one selected, platform-specific teaser per platform. 
 
 Use a mix of recognizable subject hashtags and specific article-grounded tags where appropriate, rather than obscure compounds or generic promotional slogans.
 
-**Why:** The user requested more relevant hashtags to support discovery and reach where apt, while keeping all information grounded in the article.
+**Why:** The user requested as many relevant, source-grounded hashtags as fit, rather than an arbitrary 1–2 tag target.
 
-**How to apply:** Prefer standard topic names and useful location, industry, or policy tags explicitly supported by the source. Do not pad counts, add unrelated popular tags, or promise increased reach.
+**How to apply:** Prefer standard topic names and useful location, industry, or policy tags explicitly supported by the source, up to each platform's maximum. Do not pad counts, add unrelated popular tags, or promise increased reach.
