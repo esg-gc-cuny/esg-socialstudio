@@ -11,6 +11,12 @@ Start with a topic-specific teaser, not a generic announcement. Write in the pub
 
 **How to apply:** Name the subject and include a concrete source-grounded detail, contrast, or open question. Explain the article-supported connection between them; never pair an unrelated fact with a generic question. Invite readers by naming what the article helps them understand, without inventing stakes or withholding context. Every sentence should add grounded context, attribution, or curiosity; cut filler.
 
+Question hooks are optional: use one only when it makes sense for the source and platform, not as a default for every post.
+
+**Why:** The user specifically asked for a question hook “only if it makes sense.”
+
+**How to apply:** Consider genuine questions explored by the source; keep a natural declarative opening when a question would feel forced or introduce unsupported implications.
+
 For attribution, use the verified author's name with an accurate verb instead of “the article states/says.” Preserve the source's level of certainty; if there is no verified author, state the supported point directly.
 
 Never refer to “the article” in the teaser body. Use verified author names or discuss the subject directly; the fixed “Read the full article” link CTA remains the exception.
