@@ -91,7 +91,7 @@ function parsePostText(text: string): { content: string; hashtags: string[] } {
   };
 }
 
-export function CampaignCard({
+function CampaignCard({
   campaign,
   onReview,
   saving,

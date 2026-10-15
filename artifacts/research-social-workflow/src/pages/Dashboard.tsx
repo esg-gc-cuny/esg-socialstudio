@@ -6,25 +6,19 @@ import {
   getListCampaignsQueryKey,
   getListSourcesQueryKey,
   useCreateSource,
-  useDeleteSource,
   useExtractArticle,
   useGenerateCampaign,
   useListCampaigns,
   useListSources,
   useReviewCampaign,
-  useUpdateSource,
 } from "@workspace/api-client-react";
 import type {
   Campaign,
   CampaignGenerationInput,
   CampaignReviewUpdate,
-  ContentSource,
   SourceInput,
-  SourceUpdate,
 } from "@workspace/api-client-react";
 import { CampaignPanel } from "../components/CampaignPanel";
-import { CampaignHistory } from "../components/CampaignHistory";
-import { SourcePanel } from "../components/SourcePanel";
 
 const platforms = [
   { id: "linkedin", label: "LinkedIn" },
@@ -38,8 +32,6 @@ function Dashboard() {
   const sourcesQuery = useListSources();
   const campaignsQuery = useListCampaigns();
   const createSource = useCreateSource();
-  const updateSource = useUpdateSource();
-  const deleteSource = useDeleteSource();
   const extractArticle = useExtractArticle();
   const generateCampaign = useGenerateCampaign();
   const reviewCampaign = useReviewCampaign();
@@ -50,7 +42,6 @@ function Dashboard() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["linkedin", "facebook", "bluesky", "substack"]);
   const [generateHashtags, setGenerateHashtags] = useState(true);
   const [activeCampaignId, setActiveCampaignId] = useState<number | null>(null);
-  const [activeView, setActiveView] = useState<"create" | "library">("create");
   const [notice, setNotice] = useState("");
   const [reviewSavingId, setReviewSavingId] = useState<number | null>(null);
 
@@ -60,9 +51,6 @@ function Dashboard() {
   );
   const latestCampaign =
     campaigns.find((campaign) => campaign.id === activeCampaignId) ?? campaigns[0];
-  const pastCampaigns = latestCampaign
-    ? campaigns.filter((campaign) => campaign.id !== latestCampaign.id)
-    : campaigns;
   const isGenerating = createSource.isPending || extractArticle.isPending || generateCampaign.isPending;
 
   const notify = (message: string) => {
@@ -73,46 +61,6 @@ function Dashboard() {
   const refreshAll = () => {
     void queryClient.invalidateQueries({ queryKey: getListSourcesQueryKey() });
     void queryClient.invalidateQueries({ queryKey: getListCampaignsQueryKey() });
-  };
-
-  const handleSaveSource = (payload: SourceInput | SourceUpdate, id?: number) => {
-    if (id !== undefined) {
-      updateSource.mutate(
-        { id, data: payload as SourceUpdate },
-        {
-          onSuccess: () => {
-            void queryClient.invalidateQueries({ queryKey: getListSourcesQueryKey() });
-            notify("Article changes saved.");
-          },
-          onError: () => notify("Article could not be saved. Try again."),
-        },
-      );
-      return;
-    }
-    createSource.mutate(
-      { data: payload as SourceInput },
-      {
-        onSuccess: () => {
-          void queryClient.invalidateQueries({ queryKey: getListSourcesQueryKey() });
-          notify("Article saved.");
-        },
-        onError: () => notify("Article could not be saved. Try again."),
-      },
-    );
-  };
-
-  const handleDeleteSource = (source: ContentSource) => {
-    if (!window.confirm(`Delete “${source.title}” and its associated drafts? This cannot be undone.`)) return;
-    deleteSource.mutate(
-      { id: source.id },
-      {
-        onSuccess: () => {
-          refreshAll();
-          notify("Article and associated drafts deleted.");
-        },
-        onError: () => notify("Article could not be deleted. Try again."),
-      },
-    );
   };
 
   const togglePlatform = (id: string) => {
@@ -130,7 +78,6 @@ function Dashboard() {
     selected: string[],
     shouldGenerateHashtags: boolean,
   ) => {
-    setActiveView("create");
     generateCampaign.mutate(
       {
         data: {
@@ -243,7 +190,7 @@ function Dashboard() {
 
   return (
     <div className="simple-tool-shell">
-      <main className={`simple-tool-main ${activeView === "library" ? "is-library-view" : ""}`}>
+      <main className="simple-tool-main">
         <header className="simple-tool-header">
           <div>
             <h1>ESG Social Studio</h1>
@@ -255,32 +202,7 @@ function Dashboard() {
           </div>
         </header>
 
-        <div className="studio-layout">
-          <nav className="studio-side-tabs" aria-label="ESG Social Studio sections">
-            <button
-              type="button"
-              className={`studio-side-tab${activeView === "create" ? " is-active" : ""}`}
-              aria-current={activeView === "create" ? "page" : undefined}
-              onClick={() => setActiveView("create")}
-              data-testid="tab-create-posts"
-            >
-              <span>Create posts</span>
-              <small>Start a new draft</small>
-            </button>
-            <button
-              type="button"
-              className={`studio-side-tab${activeView === "library" ? " is-active" : ""}`}
-              aria-current={activeView === "library" ? "page" : undefined}
-              onClick={() => setActiveView("library")}
-              data-testid="tab-library-history"
-            >
-              <span>Library &amp; past posts</span>
-              <small>Saved articles and drafts</small>
-            </button>
-          </nav>
-          <div className="studio-view">
-            {activeView === "create" ? (
-              <>
+        <div className="studio-view">
         <section className="panel simple-generator" data-testid="panel-simple-generator">
           <div className="panel-header">
             <div>
@@ -391,35 +313,6 @@ function Dashboard() {
             savingId={reviewSavingId}
           />
         </div>
-              </>
-            ) : (
-          <section className="library-view" aria-labelledby="library-view-title" data-testid="view-library">
-            <header className="library-view-header">
-              <h2 id="library-view-title">Library &amp; past posts</h2>
-              <p>Saved articles, primers, and every generated draft.</p>
-            </header>
-          <div className="history-grid">
-            <SourcePanel
-              sources={sources}
-              isLoading={sourcesQuery.isLoading}
-              error={sourcesQuery.isError}
-              saving={createSource.isPending || updateSource.isPending}
-              onRetry={() => void sourcesQuery.refetch()}
-              onSave={handleSaveSource}
-              onDelete={handleDeleteSource}
-            />
-            <CampaignHistory
-              campaigns={campaigns}
-              isLoading={campaignsQuery.isLoading}
-              error={campaignsQuery.isError}
-              onRetry={() => void campaignsQuery.refetch()}
-              onReview={handleReview}
-              savingId={reviewSavingId}
-            />
-          </div>
-          </section>
-            )}
-          </div>
         </div>
 
         <footer className="simple-tool-footer">Drafts only. Nothing is published or scheduled from this tool.</footer>
