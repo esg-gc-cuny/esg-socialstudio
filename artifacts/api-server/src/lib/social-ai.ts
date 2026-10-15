@@ -380,6 +380,15 @@ function splitCompleteSentences(content: string): string[] {
   return sentences;
 }
 
+function hasPlatformHook(content: string): boolean {
+  const openingSentences = splitCompleteSentences(content).slice(0, 2);
+  const firstSentence = openingSentences[0] ?? content;
+  return (
+    openingSentences.some((sentence) => sentence.includes("?")) ||
+    /\b(?:but|yet|still|while|despite|although|however|whereas|even as|could|may|might|risk|uncertain|unknown|raises?)\b/i.test(firstSentence)
+  );
+}
+
 function removeArticleOverviewSentences(content: string): string {
   const articleOverview =
     /^(?:(?:the|this) (?:full )?(?:article|analysis|essay|piece|study)|a new (?:article|essay) from)\b.*\b(?:walks?|maps?|covers?|explores?|examines?|traces?|outlines?|details?|discusses?|looks?|weighs?|considers?|describes?)\b/i;
@@ -900,11 +909,8 @@ function selectPlatformDraft(
         invitation = "";
       }
     }
-    const hasOpenLoop = (text: string) =>
-      text.includes("?") ||
-      /\b(?:but|yet|still|while|despite|although|however|could|may|might|whether|raises?|risk|uncertain|unknown)\b/i.test(text);
-    if (!hasOpenLoop(teaser)) {
-      rejected.push("teaser is missing a source-grounded curiosity question");
+    if (!hasPlatformHook(teaser)) {
+      rejected.push("teaser opening is missing an article-grounded hook or question");
       continue;
     }
     let content = [teaser, invitation].filter(Boolean).join(" ");
@@ -939,7 +945,7 @@ function selectPlatformDraft(
           .filter((hook, index, options) =>
             hook &&
             options.indexOf(hook) === index &&
-            hasOpenLoop(hook) &&
+            hasPlatformHook(hook) &&
             hasArticleTopic(hook) &&
             copyText(hook, hashtags, context.sourceUrl).length <= rules.maxCharacters,
           )[0] ?? "";
@@ -960,11 +966,11 @@ function selectPlatformDraft(
     }
     if (
       platform === "bluesky" &&
-      (!hasOpenLoop(content) ||
+      (!hasPlatformHook(content) ||
         !hasArticleTopic(content) ||
         hasUnfinishedConditionalQuestion(content))
     ) {
-      rejected.push("Bluesky post lost its article context or open question after length fitting");
+      rejected.push("Bluesky post lost its article context or hook after length fitting");
       continue;
     }
     const characterCount = fullText.length;
@@ -1100,7 +1106,7 @@ Return the final copy as a sentences array with one complete sentence per object
 
 ${context.generateHashtags ? "For discovery, mix recognizable subject hashtags with specific article-grounded location, industry, or policy tags. Aim for 3–5 on LinkedIn and Substack, 1–3 on Facebook, and 1–2 on Bluesky only where space permits. Prefer standard readable topic names and common abbreviations over invented compound tags; standard hashtag wording may differ from the article's literal words, but its topic must be explicitly discussed and supported by the paired excerpt. Rank the most useful tags first so they survive length limits. Avoid near-duplicate tags, generic campaign slogans, unrelated popular tags, and unsupported claims about trending status or reach. Keep fewer tags when the article or space does not justify more." : "Do not add hashtags even if the proposed drafts contain them."}
 
-Use one draft for each requested platform, in the same order as the proposed drafts. Follow the platform character limits below. The application adds the fixed final line “Read the full article on our website: ${context.sourceUrl ?? "[source URL unavailable]"}” after hashtags. Include that line in your character-limit calculation, but do not return it in content. Prioritize complete, supported context and the final link over hashtags. Do not cut a sentence mid-sentence.
+Use one draft for each requested platform, in the same order as the proposed drafts. Follow the platform character limits below. Aim near each platform's preferred total length when the article supports it: LinkedIn can use more room for context, while Bluesky should stay brief. Do not pad shorter platform posts. Preserve the opening hook and the final link over hashtags. The application adds the fixed final line “Read the full article on our website: ${context.sourceUrl ?? "[source URL unavailable]"}” after hashtags. Include that line in your character-limit calculation, but do not return it in content. Do not cut a sentence mid-sentence.
 
 Return only valid JSON matching this shape. Replace all examples with final copy and exact article excerpts:
 ${JSON.stringify(responseShape)}
@@ -1118,6 +1124,8 @@ ${JSON.stringify(context.platforms.map((platform) => ({
           : 0) -
         (context.generateHashtags ? platformRules[platform].maxHashtags * 20 + 4 : 0),
     ),
+    preferredCharacters: platformRules[platform].preferredCharacters,
+    maxTeaserSentences: platformRules[platform].maxTeaserSentences,
     style: platformRules[platform].style,
     structure: platformRules[platform].structure,
   })))}
@@ -1214,15 +1222,15 @@ function parseGroundedDrafts(
     if (fullText.length > rules.maxCharacters) {
       throw new Error(`${platform} reviewed content exceeds its ${rules.maxCharacters}-character limit.`);
     }
+    if (!hasPlatformHook(content)) {
+      throw new Error(`${platform} reviewed content must retain an article-grounded hook or question.`);
+    }
     if (platform === "bluesky") {
-      const hasHook =
-        content.includes("?") ||
-        /\b(?:but|yet|still|while|despite|although|however|could|may|might|risk|uncertain|unknown|raises?)\b/i.test(content);
       const hasUnfinishedQuestion = splitCompleteSentences(content).some((sentence) =>
         /^\s*(?:if|whether)\b[^?]*\?\s*$/i.test(sentence),
       );
-      if (!hasHook || hasUnfinishedQuestion) {
-        throw new Error("The reviewed Bluesky post must retain a complete question or a clear, source-grounded tension hook.");
+      if (hasUnfinishedQuestion) {
+        throw new Error("The reviewed Bluesky post must not use an unfinished conditional question.");
       }
     }
 

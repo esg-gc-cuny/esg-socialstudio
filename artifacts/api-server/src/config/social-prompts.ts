@@ -50,15 +50,15 @@ export const platformRules: Record<
   linkedin: {
     minCharacters: 350,
     maxCharacters: 1300,
-    preferredCharacters: 550,
+    preferredCharacters: 850,
     invitationMaxCharacters: 130,
     minHashtags: 0,
     maxHashtags: 5,
     style:
       "Polished, credible, and insight-led. Sound like an informed organizational publisher opening a useful professional conversation, not a paper abstract or a corporate announcement. Use clear economic or policy language and up to five relevant hashtags when they improve discovery.",
     structure:
-      "Write one compact paragraph of two or three concise sentences: source-grounded hook, professional or policy stakes, and a meaningful open question or invitation. Let author attribution continue the same thought; avoid a detached author-credit sentence.",
-    maxTeaserSentences: 3,
+      "Write a compact three- or four-sentence post: open with a sharp source-grounded hook, add enough context to explain the professional or policy stakes, and leave a meaningful question open. Use the extra space for relevant context, not a list of findings or the conclusion. Let author attribution continue the same thought.",
+    maxTeaserSentences: 4,
   },
   facebook: {
     minCharacters: 300,
@@ -219,6 +219,7 @@ export function buildPlatformPrompt(input: PlatformPromptInput): string {
   const rules = platformRules[input.platform];
   const isBluesky = input.platform === "bluesky";
   const isSubstack = input.platform === "substack";
+  const isLinkedIn = input.platform === "linkedin";
   const hashtagLimit = input.generateHashtags ? rules.maxHashtags : 0;
   const hashtagExample = hashtagLimit > 0
     ? `["#SpecificTopic", "#RelatedTopic"]`
@@ -227,7 +228,9 @@ export function buildPlatformPrompt(input: PlatformPromptInput): string {
     ? `["<verbatim article excerpt supporting sentence 1>", "<verbatim article excerpt supporting sentence 2>"]`
     : isSubstack
       ? `["<verbatim article excerpt supporting sentence 1>", "<verbatim article excerpt supporting sentence 2>", "<verbatim article excerpt supporting sentence 3>", "<verbatim article excerpt supporting invitation>"]`
-      : `["<verbatim article excerpt supporting sentence 1>", "<verbatim article excerpt supporting sentence 2>", "<verbatim article excerpt supporting invitation>"]`;
+      : isLinkedIn
+        ? `["<verbatim article excerpt supporting sentence 1>", "<verbatim article excerpt supporting sentence 2>", "<verbatim article excerpt supporting sentence 3>", "<verbatim article excerpt supporting invitation>"]`
+        : `["<verbatim article excerpt supporting sentence 1>", "<verbatim article excerpt supporting sentence 2>", "<verbatim article excerpt supporting invitation>"]`;
   const hashtagEvidenceExample = hashtagLimit > 0
     ? `["<verbatim article excerpt supporting hashtag 1>", "<verbatim article excerpt supporting hashtag 2>"]`
     : "[]";
@@ -251,10 +254,12 @@ export function buildPlatformPrompt(input: PlatformPromptInput): string {
     ? `Return exactly two variants: one "single" post and one "thread" with 2–3 posts. The single post is the only option shown in the current review card.`
     : `Return exactly three single-post variants, each using a different hook angle. Set recommended_index to the zero-based index of the strongest variant for the current review card.`;
   const lengthGuidance = isBluesky
-    ? "Use available characters for article context. Omit optional hashtags and the byline before dropping a useful fact or the unresolved question."
+    ? "Keep the post compact, usually 220–280 total characters when the final link allows. Never pad; keep the subject and hook ahead of hashtags."
     : isSubstack
       ? "Aim for roughly 450–700 total characters when the article supports that much context. A shorter, complete teaser is better than filler."
-      : "Stay near the platform target unless another source detail is needed to make the hook clear.";
+      : isLinkedIn
+        ? "Aim for roughly 700–950 total characters when the article supports that much context. Use the extra room for one relevant detail and its stakes, not a longer summary."
+        : "Aim for roughly 350–500 total characters when the article supports that much context. Keep it conversational and do not pad.";
   const outputShape = isBluesky
     ? `{
   "platform": "bluesky",
@@ -282,7 +287,7 @@ Editorial rules:
 - Make the post sound like a human editor who understands the article, not generic marketing copy.
 - Open with a strong, article-specific hook drawn from hook_angles or best_details. A surprising result, contrast, consequence, or unresolved tension is stronger than a bare statistic.
 - Tease, do not summarize. Give enough context for someone unfamiliar with the article to understand its subject and why it matters, then leave one meaningful question unresolved. Do not reveal the full conclusion or list findings, benefits, risks, methods, categories, or recommendations.
-- The content field must contain a specific, source-grounded open question with a question mark. Bluesky may instead use one brief tension statement with an unresolved implication. Connect one verified detail or clear tension to a consequential unknown; a bare statistic or generic question is not a hook.
+- The first sentence in the content field must work as a hook: a specific, source-grounded question or an arresting fact or contrast that leaves an important implication unresolved. Do not open with a bare statistic, article announcement, or generic question. Bluesky may use one brief tension statement instead of a question.
 - Name the economic subject or article-specific detail in the hook itself. Never open with a context-free reference such as “What is driving that reversal?” or “Why does this matter?”.
 - Build a curiosity gap: stop before the article answers that question. The invitation should make tapping feel worthwhile by pointing to a specific, surprising connection or unanswered implication, without giving that answer away.
 - Each single-post variant has two internal fields: content is the teaser; invitation continues the same idea in one concise sentence. The application joins them with a single space so the post reads as one coherent paragraph, followed by optional hashtags and the final link line. Do not make the invitation a separate announcement.
