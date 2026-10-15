@@ -13,6 +13,12 @@ Start with a topic-specific teaser, not a generic announcement. Write in the pub
 
 For attribution, use the verified author's name with an accurate verb instead of “the article states/says.” Preserve the source's level of certainty; if there is no verified author, state the supported point directly.
 
+Never refer to “the article” in the teaser body. Use verified author names or discuss the subject directly; the fixed “Read the full article” link CTA remains the exception.
+
+**Why:** The user repeated that the posts should sound like a professional publisher inviting followers, not a detached reviewer.
+
+**How to apply:** Keep professional, curious platform-specific context, tease rather than disclose all findings, and avoid commentary about what the article does or does not settle.
+
 **Why:** The user requested author-led attribution rather than treating the article as the speaker.
 
 **How to apply:** Use verbs such as explains, examines, argues, or suggests only when accurate to the source. Do not force attribution into every sentence or invent a byline.

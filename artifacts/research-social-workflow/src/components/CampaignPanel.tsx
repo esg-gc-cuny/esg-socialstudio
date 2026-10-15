@@ -68,18 +68,38 @@ function splitArticleLink(content: string): { body: string; url: string } {
 
 function getCopiedPostText(content: string, hashtags: string[]): string {
   const { body, url } = splitArticleLink(content);
+  const embeddedTags = Array.from(body.matchAll(/(^|\s)(#[\p{L}\p{N}_-]+)/gu))
+    .map((match) => match[2]);
+  const seen = new Set<string>();
+  const uniqueTags = [...embeddedTags, ...hashtags].filter((tag) => {
+    const key = tag.trim().toLowerCase();
+    if (!key || excludedHashtags.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  const cleanBody = body
+    .replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, "$1")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
   return [
-    body,
-    hashtags.join(" "),
+    cleanBody,
+    uniqueTags.join(" "),
     url ? `Read the full article on our website: ${url}` : "",
   ].filter(Boolean).join("\n\n");
 }
 
 function parsePostText(text: string): { content: string; hashtags: string[] } {
   const { body, url } = splitArticleLink(text);
+  const seen = new Set<string>();
   const hashtags = Array.from(body.matchAll(/(^|\s)(#[\p{L}\p{N}_-]+)/gu))
     .map((match) => match[2])
-    .filter(Boolean);
+    .filter((tag) => {
+      const key = tag.toLowerCase();
+      if (seen.has(key) || excludedHashtags.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   const bodyWithoutHashtags = body
     .replace(/(^|\s)#[\p{L}\p{N}_-]+/gu, "$1")
     .replace(/\n{3,}/g, "\n\n")

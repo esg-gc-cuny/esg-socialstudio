@@ -457,7 +457,7 @@ function normalizeHashtags(
       .replace(/[^\p{L}\p{N}_-]/gu, "");
     if (!body) continue;
     const tag = `#${body}`;
-    if (!excluded.has(tag.toLowerCase()) && !tags.includes(tag)) tags.push(tag);
+    if (!excluded.has(tag.toLowerCase()) && !tags.some((existing) => existing.toLowerCase() === tag.toLowerCase())) tags.push(tag);
   }
   return tags.slice(0, policy.maxHashtags);
 }
@@ -1067,6 +1067,10 @@ function selectPlatformDraft(
       continue;
     }
     let content = [teaser, invitation].filter(Boolean).join(" ");
+    if (/\b(?:the|this) article\b/i.test(content)) {
+      rejected.push("detached article reference instead of publisher copy");
+      continue;
+    }
     if (hasNonThirdPersonText(content)) {
       rejected.push("first-person or second-person wording");
       continue;
@@ -1264,6 +1268,8 @@ Review and improve each proposed draft as an experienced social editor. Remove o
 
 The application adds “Read the full article on our website” with the link as the final call to action. Do not force a second invitation sentence or repeat that CTA. Use the body for the hook and, when useful, a concise article-specific detail or verified author attribution. A second body sentence may invite further reading only when it adds a concrete, source-supported reason and sounds natural. Preserve the platform's native voice and the publisher's third-person perspective. Cut generic filler and unsupported claims. Do not use first-person or second-person pronouns, emojis, em dashes, en dashes, or double hyphens.
 
+Write as the publisher's professional social media marketing manager inviting followers to continue reading, not as a detached reviewer. Never use “the article”, “this article”, or “the authors” in the body. Name verified authors with an accurate verb, or discuss the subject directly. The application-added “Read the full article” CTA is the sole exception. Keep the teaser selective: a source-supported hook, enough context to understand its significance, and at most one supporting detail. Do not enumerate sectors, statistics, explanations, or conclusions. Leave the reasoning and full findings for readers to discover. LinkedIn can develop the context in two or three connected sentences; Facebook should be accessible and conversational; Bluesky must be compact but understandable; Substack should be thoughtful without becoming a miniature summary.
+
 When the article has a verified byline, include the author or authors naturally in the post when platform space allows. Use the exact name and an accurate verb such as examines, explains, argues, suggests, or finds; never strengthen tentative language into a proven conclusion. Do not make the article itself the speaker. If no clear byline is present, state the supported point directly without inventing attribution. Keep attribution natural and brief.
 
 Return one or more complete sentences, up to the platform's sentence limit. The first sentence must have role "hook"; any remaining sentence must have role "context". The fixed final link line is the call to action, so do not add a generic invitation merely to fill space. Pair every sentence with one exact excerpt that directly supports it. Evidence is internal validation only and must not appear in post text. Return hashtags as objects paired with exact excerpts that support each tag. Use only article-named people, places, institutions, industries, or topics. Remove tags that rely on inferred or outside context. ${context.generateHashtags ? "Include as many distinct, relevant tags as fit, up to the platform's maximum; the example array shows capacity, not a required number." : "Return no hashtags."}
@@ -1367,7 +1373,7 @@ function parseGroundedDrafts(
     if (!hasEditorialHook(sentences[0])) {
       throw new Error(`${platform} opening must frame a supported contrast or genuine question, not a bare statistic or summary.`);
     }
-    if (/\b(?:the|this|our)(?:\s+(?:new|latest|newly published))?\s+(?:article|analysis|essay|study|paper|report)\s+(?:says|states|explains|argues|suggests|finds|shows|notes|reports|examines|discusses|highlights|traces|describes|details|identifies|connects|reveals)\b/i.test(content)) {
+    if (/\b(?:the|this) article\b/i.test(content) || /\b(?:the|this|our)(?:\s+(?:new|latest|newly published))?\s+(?:article|analysis|essay|study|paper|report)\s+(?:says|states|explains|argues|suggests|finds|shows|notes|reports|examines|discusses|highlights|traces|describes|details|identifies|connects|reveals)\b/i.test(content)) {
       throw new Error(`${platform} reviewed content must attribute statements to verified authors, not the article, or state the point directly.`);
     }
     if (hasNonThirdPersonText(content)) {
@@ -1436,6 +1442,7 @@ function keepOnlyEditoriallyReadyDrafts(
       sentences.length < 1 ||
       sentences.length > platformRules[platform].maxTeaserSentences ||
       !hasPlatformHook(body, getTitleTopicTerms(context.title)) ||
+      /\b(?:the|this) article\b/i.test(body) ||
       !hasEditorialHook(sentences[0] ?? "")
     );
   });
@@ -1551,12 +1558,12 @@ export async function generatePlatformDrafts(
         withoutAppendedCta(draft.content, context.sourceUrl),
         analysis.author_byline,
       );
-      const content = copyText(body, draft.hashtags, context.sourceUrl);
-      if (content.length > draft.characterLimit) return draft;
+      const fullText = copyText(body, draft.hashtags, context.sourceUrl);
+      if (fullText.length > draft.characterLimit) return draft;
       return {
         ...draft,
-        content,
-        characterCount: content.length,
+        content: appendCta(body, context.sourceUrl),
+        characterCount: fullText.length,
       };
     }),
     inputTokens:
