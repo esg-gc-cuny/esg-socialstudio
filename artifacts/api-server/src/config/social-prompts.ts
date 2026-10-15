@@ -247,19 +247,13 @@ export function buildPlatformPrompt(input: PlatformPromptInput): string {
       (ctaLine ? 2 : 0) -
       hashtagReserve,
   );
-  const minimumBodyBudget = Math.max(
-    0,
-    rules.minCharacters -
-      ctaLine.length -
-      (ctaLine ? 2 : 0),
-  );
   const variantInstructions = isBluesky
     ? `Return exactly two variants: one "single" post and one "thread" with 2–3 posts. The single post is the only option shown in the current review card.`
     : `Return exactly three single-post variants, each using a different hook angle. Set recommended_index to the zero-based index of the strongest variant for the current review card.`;
   const lengthGuidance = isBluesky
     ? "Use available characters for article context. Omit optional hashtags and the byline before dropping a useful fact or the unresolved question."
     : isSubstack
-      ? "Aim for roughly 450–700 total characters. Use the extra room for a clear subject, concrete context, and stakes, not a longer summary."
+      ? "Aim for roughly 450–700 total characters when the article supports that much context. A shorter, complete teaser is better than filler."
       : "Stay near the platform target unless another source detail is needed to make the hook clear.";
   const outputShape = isBluesky
     ? `{
@@ -307,15 +301,15 @@ Editorial rules:
 - Do not use emojis, em dashes, en dashes, or double hyphens.
 - ${hashtagInstructions} Keep tags specific to the article, never generic campaign slogans. Replace the format-only hashtag examples with real tags, not placeholders.
 - The application adds the final line “Read the full article on our website: ${input.sourceUrl ?? "[source URL unavailable]"}” after hashtags when a source URL is available. Do not put a CTA or URL in the generated content.
-- Character ranges include the final URL, CTA, line breaks, and hashtags. Keep each complete variant within the stated range; never cut a sentence to fit. For Bluesky, preserve the full contextual hook first and drop optional hashtags or byline if needed.
-- The content and invitation fields together should be at least ${minimumBodyBudget} characters when a minimum applies, and no longer than ${bodyBudget} characters before the application adds hashtags and the final CTA/link.
+- Character ranges include the final URL, CTA, line breaks, and hashtags. Keep each complete variant within the stated maximum; never cut a sentence to fit. For Bluesky, preserve the full contextual hook first and drop optional hashtags or byline if needed.
+- The content and invitation fields together must be no longer than ${bodyBudget} characters before the application adds hashtags and the final CTA/link. No minimum length applies; do not add filler.
 - Tone preference: ${input.tone}. The article's voice_profile takes priority over generic tone defaults.
 - Intended audience: ${input.audience || input.analysis.audience}
 - Campaign goal: ${input.campaignGoal || "Earn informed clicks to the full article."}
 
 Platform: ${input.platform}
 Platform rules: ${rules.style}
-Character range: ${rules.minCharacters}–${rules.maxCharacters} total, including the application-added CTA/link and hashtags.
+Maximum length: ${rules.maxCharacters} total, including the application-added CTA/link and hashtags.
 Preferred total length: around ${rules.preferredCharacters} characters. ${lengthGuidance}
 Hashtag count: 0–${hashtagLimit}.
 Post structure: ${rules.structure}
