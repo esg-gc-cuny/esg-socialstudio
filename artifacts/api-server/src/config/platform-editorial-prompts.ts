@@ -43,6 +43,7 @@ Leave the full argument, evidence, and conclusion to the linked piece.
 
 HOOK CHOICE
 A question works only when the source actually investigates it. Do not invent uncertainty, policy stakes, or a dramatic contradiction. A clear declarative contrast is equally valid. Do not begin with a generic "New research", "Our latest", or a detached headline label.
+Create measured curiosity by showing where a headline finding and the underlying picture differ, if that contrast is supported. Make the reader want to understand the relationship; do not explain the whole mechanism or announce its answer in the opening.
 
 INVITATION
 Integrate full verified author names into a specific invitation where a byline exists. Vary the wording naturally: a closer look at a particular relationship, exploration of an unanswered question, or following the reasoning behind a supported observation. Do not default to "With [names], explore..." on every post.
@@ -73,6 +74,7 @@ Leave the explanation and conclusions for the source. Do not stack numbers, list
 
 HOOK CHOICE
 Use a natural question only when the source addresses it. Do not ask "What do you think?", demand comments, manufacture an everyday consequence, or use clickbait. A plain but intriguing contrast can be more effective than a forced question.
+Give readers a specific reason to wonder, using a clear difference between what the source's headline measures show and the experience or detail it discusses. Keep the subject understandable, but leave the explanation to the authors. Do not imply that something is shocking, hidden, or personally threatening.
 
 INVITATION
 Sound like an organization welcoming readers, not an outside reviewer describing a document. A specific invitation to read the authors' perspective should follow naturally from the opening. Use full verified author names when available, not "the authors" or "the article".
@@ -101,6 +103,7 @@ Identify the subject clearly; never rely on unexplained "this gap", "that shift"
 
 HOOK CHOICE
 A sharp observation or supported contrast often works. Use a question only when it is natural and genuinely addressed by the source. Never invent a mystery or an unfinished conditional question. Do not write four clauses to squeeze in more findings.
+Make the invitation's object an interesting source-supported relationship or contrast, not a bare topic label. Use economical curiosity such as a genuine "how" or "why" the authors explore, rather than listing their answer. Do not imply causation merely to make a "why" hook.
 
 INVITATION
 Use a brief, actual invitation to explore one supported question or relationship. Keep the answer for the source. Use a natural verb such as read, explore, discover, follow, or take a closer look, without adding "you" or a generic "learn more".
@@ -131,6 +134,7 @@ End while there is still a reason to read the full piece. Do not summarize the w
 
 HOOK CHOICE
 A reflective question is welcome only when supported. An intelligent observation can do the same work. Do not force a question, use "here's why", or invent implications for an audience the source does not discuss.
+Introduce a specific source-supported puzzle or nuance worth thinking through. Supply enough context to understand it, then invite the authors' reasoning without summarizing their resolution. The curiosity should come from the idea itself, not dramatic adjectives or manufactured suspense.
 
 INVITATION
 Make the transition from the opening idea to the reading invitation feel like one editorial thought, not a pasted marketing line. Invite engagement with the authors' actual reasoning, not a vague promise of "insights". No commentary about what "the article" says or does not settle.
@@ -161,6 +165,7 @@ NON-NEGOTIABLE SOURCE AND VOICE RULES
 - Preserve the source's geography, population, and timeframe for EACH claim. A national statistic quoted in a city-focused piece is still national; never silently relabel it as a city statistic. Do not join separate findings into a causal or geographic claim the source does not make.
 - No emojis, double hyphens, em dashes, or en dashes. No "dive in", "unlock", "game-changing", "you won't believe", "here's why", stock "newly published" openings, or empty engagement questions.
 - Make the body an inviting teaser with context, not a list of findings. Include a natural, explicit invitation connected to the source's subject. A question is optional; curiosity must be honest.
+- Increase curiosity modestly: reveal the subject and one supported contrast or nuance, but leave the main explanation for the source. Do not ask a question and immediately answer it. The invitation should identify what readers can explore with the verified authors, not list every conclusion. Avoid "surprising", "shocking", "hidden", "secret", or "everything changes" as promotional framing. Never withhold context needed to understand the hook.
 - Return complete sentences only. Never truncate to fit.
 
 OUTPUT AND LENGTH
