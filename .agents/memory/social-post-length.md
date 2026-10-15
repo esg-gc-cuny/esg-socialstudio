@@ -7,9 +7,9 @@ Never fit a social teaser by cutting in the middle of a sentence. Prefer complet
 
 Start with a topic-specific teaser, not a generic announcement. Write in the publisher's third-person voice and integrate a verified author naturally when it strengthens the post, but do not force a fixed opening or byline. “Our” is allowed in natural publisher phrasing and the final CTA; avoid first-person singular, emojis, dash punctuation, and unsupported audience claims. Give enough context to create curiosity without summarizing the full article.
 
-**Why:** The user asked for the hook to carry enough article context and not rely on filler.
+**Why:** The user repeatedly flagged posts as lacking context, accuracy, or reader appeal.
 
-**How to apply:** Name the subject and include a concrete source-grounded detail, contrast, or open question. Every sentence should add context, stakes, attribution, or curiosity; cut generic filler and do not pad for length.
+**How to apply:** Name the subject and include a concrete source-grounded detail, contrast, or open question. Explain the article-supported connection between them; never pair an unrelated fact with a generic question. Invite readers by naming what the article helps them understand, without inventing stakes or withholding context. Every sentence should add grounded context, attribution, or curiosity; cut filler.
 
 For attribution, use the verified author's name with an accurate verb instead of “the article states/says.” Preserve the source's level of certainty; if there is no verified author, state the supported point directly.
 
