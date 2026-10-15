@@ -69,6 +69,14 @@ function Dashboard() {
       : [...current, id]);
   };
 
+  const resetFields = () => {
+    setInputMode("paste");
+    setSourceContent("");
+    setArticleUrl("");
+    setSelectedPlatforms(platforms.map((platform) => platform.id));
+    setGenerateHashtags(true);
+  };
+
   const scrollToResults = () => {
     document.getElementById("generated-drafts")?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -290,6 +298,15 @@ function Dashboard() {
               ))}
             </div>
             <div className="quick-form-actions">
+              <button
+                type="button"
+                className="button button-quiet"
+                onClick={resetFields}
+                disabled={isGenerating}
+                data-testid="button-reset-fields"
+              >
+                Reset fields
+              </button>
               <button
                 type="submit"
                 className="button button-primary"
