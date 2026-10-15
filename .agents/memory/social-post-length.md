@@ -33,7 +33,7 @@ Keep the hook and concise context in one coherent, inviting teaser. The fixed fu
 
 **Why:** The user found link-only invitations too statement-like. Earlier rigid invitation templates also produced repetitive filler, so the invitation needs to be integrated and source-specific.
 
-**How to apply:** Budget the final CTA and hashtags first. Connect the hook to what readers can discover through the verified authors' work, using a natural invitation rather than a neutral summary. Keep it platform-sized, source-grounded, and especially concise on Bluesky.
+**How to apply:** Budget the final CTA and hashtags first. Attribute each author once, not again in the invitation; use the remaining space for context and source-grounded curiosity. Keep the teaser especially concise on Bluesky.
 
 For ESG Social Studio, use one selected, platform-specific teaser per platform. Bluesky and Substack need enough standalone context to name the subject, ground it in a concrete article detail, and make the open question clear. A Bluesky opener must be a real source-supported hook, such as a meaningful tension, contrast, specific detail, or genuine open question, not just a topic restatement or compressed summary. If no true tension exists, lead with the sharpest supported observation rather than inventing one. On Bluesky, drop the byline and optional hashtags before cutting context to fit the link. Never invent facts or author names; keep the article's explanation and conclusions for the reader to discover.
 
@@ -63,4 +63,4 @@ Use a mix of recognizable subject hashtags and specific article-grounded tags wh
 
 **Why:** The user requested as many relevant, source-grounded hashtags as fit, rather than an arbitrary 1–2 tag target.
 
-**How to apply:** Prefer standard topic names and useful location, industry, or policy tags explicitly supported by the source, up to each platform's maximum. Do not pad counts, add unrelated popular tags, or promise increased reach.
+**How to apply:** Scan the whole source for standard field, issue, location, industry, or policy tags. Do not stop at one or two when several distinct relevant topics are supported; allow accurate standard category labels as well as literal words. Keep body context ahead of tags, especially on Bluesky. Do not pad counts, add unrelated tags, or promise increased reach.

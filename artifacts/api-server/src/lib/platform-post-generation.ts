@@ -63,11 +63,13 @@ function supportedTag(tag: string, evidence: string): boolean {
   const topic = normalized(tag.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^#/, ""));
   const quote = normalized(evidence);
   const recognizableTopics: Record<string, RegExp> = {
-    economics: /\beconom(?:ic|ics|y)|\bemployment\b|\bunemployment\b|\bmonetary\b|\bfinancial\b/,
+    economics: /\beconom(?:ic|ics|y|ist)|\bemployment\b|\bunemployment\b|\bmonetary\b|\bfinancial\b|\binflation\b|\bwages?\b/,
     "labor market": /\blabou?r\b|\bemployment\b|\bunemployment\b|\bjobs?\b|\bhiring\b/,
     jobs: /\bjobs?\b|\bemployment\b|\bunemployment\b|\bhiring\b/,
     employment: /\bemployment\b|\bunemployment\b|\bjobs?\b|\bhiring\b/,
     banking: /\bbanks?\b|\bbanking\b/,
+    "cost of living": /\bcost of living\b|\baffordab|\bliv(?:ing|able) wage\b|\brising costs?\b/,
+    "economic indicators": /\beconomic indicators?\b|\bheadline (?:measures|figures)\b|\baggregate statistics\b/,
   };
   if (recognizableTopics[topic]) return recognizableTopics[topic].test(quote);
   if (quote.replaceAll(" ", "").includes(topic.replaceAll(" ", ""))) return true;
@@ -212,6 +214,11 @@ ${issue.includes("Numeric value(s)")
   : ""}
 ${issue.includes("pronouns")
   ? "VOICE REPAIR: Rewrite first- and second-person phrasing using the verified author names or the factual subject. Do not copy 'our' or 'we' from source quotations. No I, me, my, we, us, our, you, or your in any sentence, including the invitation. Do not include the application-added website CTA in the sentence array."
+  : ""}
+${issue.includes("exact source excerpts")
+  ? `EVIDENCE REPAIR: The previous supporting quote was not found verbatim. Choose factual claims directly supported by the passages below, and COPY the supporting passage exactly into evidence. Do not paraphrase evidence, fix source typos, invent a quote, or join nonadjacent phrases into one excerpt. A full paragraph is acceptable as evidence; the public post should remain a concise, inviting teaser. Keep a single author attribution and the useful source-supported hashtags.
+Verbatim source passages:
+${JSON.stringify(source.content.split(/\n\s*\n/).map((passage) => passage.trim()).filter((passage) => passage.length >= 60).slice(0, 6))}`
   : ""}
 Keep this platform's audience, tone, and invitation. Recheck the corrected text, source evidence, and full character budget. Return only corrected JSON in the same format, not the previous draft.`);
       try {

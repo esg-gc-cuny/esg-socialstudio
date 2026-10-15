@@ -24,7 +24,7 @@ export const platformEditorialBriefs: Record<SocialPlatform, EditorialBrief> = {
     name: "LinkedIn",
     maxCharacters: 1300,
     maxSentences: 4,
-    maxHashtags: 5,
+    maxHashtags: 8,
     prompt: `REQUEST: WRITE ONE LINKEDIN POST
 
 Role: Senior economics editor working with the publisher's social media marketing manager.
@@ -49,13 +49,13 @@ INVITATION
 Integrate full verified author names into a specific invitation where a byline exists. Vary the wording naturally: a closer look at a particular relationship, exploration of an unanswered question, or following the reasoning behind a supported observation. Do not default to "With [names], explore..." on every post.
 
 HASHTAGS
-Choose up to five distinct, useful inline hashtags when enabled, normally three to five if the source supports them. Combine a recognizable field with the actual issue, sector, or place. Examples ONLY when explicitly relevant: #Economics, #LaborMarket, #Employment, #NewYorkCity, #MonetaryPolicy, #Stablecoins. Rank the most useful first. Do not pad counts, invent compound slogans, or imply that a tag is trending.`,
+When enabled, look across the source for distinct relevant fields, issues, instruments, sectors, and places. Aim for four to eight useful tags when that breadth is supported and space permits, not a default one or two. Examples ONLY when relevant: #Economics, #LaborMarket, #Employment, #NewYorkCity, #MonetaryPolicy, #Stablecoins. Rank the most useful first. Do not pad counts, invent compound slogans, or imply that a tag is trending.`,
   },
   facebook: {
     name: "Facebook",
     maxCharacters: 700,
     maxSentences: 3,
-    maxHashtags: 3,
+    maxHashtags: 6,
     prompt: `REQUEST: WRITE ONE FACEBOOK POST
 
 Role: Senior editor and community-minded social media manager publishing from an economics research organization's account.
@@ -80,7 +80,7 @@ INVITATION
 Sound like an organization welcoming readers, not an outside reviewer describing a document. A specific invitation to read the authors' perspective should follow naturally from the opening. Use full verified author names when available, not "the authors" or "the article".
 
 HASHTAGS
-Use as many distinct source-relevant tags as are useful, up to three when enabled. Favor readable subject and location tags over specialist abbreviations. Examples ONLY if supported: #Jobs, #Employment, #NewYorkCity, #Banking, #Stablecoins. Do not add a generic research slogan or unrelated popular tag.`,
+When enabled, select as many distinct useful source-relevant tags as fit, up to six. Aim for three to six when the source supports that breadth, not a default one or two. Favor readable subject, issue, sector, and location tags over specialist abbreviations. Examples ONLY if supported: #Economics, #Jobs, #Employment, #NewYorkCity, #Banking, #Stablecoins, #Affordability. Do not pad the list with near-duplicates, generic slogans, or unrelated popular tags.`,
   },
   bluesky: {
     name: "Bluesky",
@@ -115,7 +115,7 @@ Use zero to three distinct, recognizable topic tags when enabled AND space remai
     name: "Substack Note",
     maxCharacters: 900,
     maxSentences: 4,
-    maxHashtags: 5,
+    maxHashtags: 6,
     prompt: `REQUEST: WRITE ONE SUBSTACK NOTE, NOT A NEWSLETTER
 
 Role: Senior economics editor combining editorial judgment with a publisher's reader-development goals.
@@ -140,7 +140,7 @@ INVITATION
 Make the transition from the opening idea to the reading invitation feel like one editorial thought, not a pasted marketing line. Invite engagement with the authors' actual reasoning, not a vague promise of "insights". No commentary about what "the article" says or does not settle.
 
 HASHTAGS
-Treat these as inline post hashtags, not newsletter categories or publication tags. Add distinct relevant subject tags when useful, up to five if enabled and they fit naturally. Examples ONLY if explicitly supported: #Economics, #EconomicPolicy, #LaborMarket, #Banking, #Stablecoins. Do not force tags into a reflective Note, invent slogans, or promise increased reach.`,
+Treat these as inline post hashtags, not newsletter categories or publication tags. When enabled, examine the source for a broader mix of distinct relevant subjects and issues; include three to six useful tags when supported and space permits, rather than stopping at one or two. Examples ONLY if supported: #Economics, #EconomicPolicy, #LaborMarket, #Banking, #Stablecoins. Preserve the Note's context and reflective voice. Do not pad the list, invent slogans, or promise increased reach.`,
   },
 };
 
@@ -161,6 +161,7 @@ NON-NEGOTIABLE SOURCE AND VOICE RULES
 - Use third-person publisher voice. No I, me, my, we, us, our, you, or your in the body. Invitations using imperative verbs without those pronouns are allowed. The fixed CTA's "our website" is the sole exception.
 - Never use "the article", "this article", "the paper", "the study", "the authors", or "the group" in the body. Use verified author names or the subject directly.
 - Attribute any named authors only to their own work. If there is no identifiable byline, return an empty authors array and omit attribution rather than guessing from quoted experts or references.
+- Mention each verified author only once in the body, including surname references. Put attribution in the most natural sentence, not in both the context and invitation. For later references use "their analysis", "that reasoning", or the subject itself. Do not spend teaser space repeating a byline; use it for connected context and honest curiosity.
 - Preserve uncertainty. Do not change "may" into "will", correlations into causes, or an author's argument into an established fact.
 - Preserve the source's geography, population, and timeframe for EACH claim. A national statistic quoted in a city-focused piece is still national; never silently relabel it as a city statistic. Do not join separate findings into a causal or geographic claim the source does not make.
 - No emojis, double hyphens, em dashes, or en dashes. No "dive in", "unlock", "game-changing", "you won't believe", "here's why", stock "newly published" openings, or empty engagement questions.
@@ -184,7 +185,7 @@ Return valid JSON only, with this shape:
 }
 The sentence array is illustrative, not a requirement to write exactly two sentences. Use roles hook, context, or invitation. One sentence may be both a hook and an invitation; label it invitation in that case. At most ${brief.maxSentences} sentences. Every sentence needs source evidence for its factual subject and relationship; invitation verbs themselves need no factual evidence. More than one excerpt is allowed when necessary to support the entire sentence.
 ${source.generateHashtags
-    ? `Hashtags enabled: return only distinct, useful tags supported by exact source excerpts, maximum ${brief.maxHashtags}. The example tag is a placeholder to replace, not a tag to copy.`
+    ? `Hashtags enabled: independently scan the full source for its field, principal issue, named sectors, policy or financial instruments, and relevant geography. Return the useful, distinct tags across those categories, maximum ${brief.maxHashtags}; do not stop at one or two when more relevant categories are available. Each tag needs its own supporting excerpt. Standard topic labels and accurate synonyms are allowed even if the hashtag spelling is not printed verbatim. Avoid near-duplicate synonyms and prioritize the most relevant tags. The example tag is a placeholder, not a limit on the array size or a tag to copy.`
     : "Hashtags DISABLED: return an empty hashtags array, and no tags in sentences."}
 No hashtags or URLs in sentence text. The application inserts hashtags once, then adds the fixed CTA as the FINAL line. Do not return that CTA in the body.
 Fixed final CTA: ${cta || "(No source URL available; do not invent one.)"}

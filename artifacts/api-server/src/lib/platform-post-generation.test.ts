@@ -66,7 +66,22 @@ test("four platforms have distinct audiences, writing briefs, and hashtag instru
     assert.match(prompt, /source is the only factual authority/i);
     assert.ok(prompt.includes(source.content));
     assert.match(prompt, /question is optional/i);
+    assert.match(prompt, /Mention each verified author only once/);
+    assert.match(prompt, /do not stop at one or two/i);
   }
+});
+
+test("a broader set of supported subject hashtags survives without padding or repeats", () => {
+  const quote = "Economists examined inflation, wages, the affordability crisis, and the election.";
+  const broadSource = { ...source, content: `${source.content}\n${quote}` };
+  const data = response();
+  data.hashtags = ["#Economics", "#Inflation", "#Wages", "#CostOfLiving", "#Affordability", "#Elections"]
+    .map((tag) => ({ tag, evidence: quote }));
+  data.hashtags.push({ tag: "#Inflation", evidence: quote });
+  data.hashtags.push({ tag: "#Bitcoin", evidence: quote });
+  const draft = parseIndependentPost(JSON.stringify(data), "facebook", broadSource);
+  assert.deepEqual(draft.hashtags, ["#Economics", "#Inflation", "#Wages", "#CostOfLiving", "#Affordability", "#Elections"]);
+  assert.ok(draft.characterCount <= draft.characterLimit);
 });
 
 test("one successful request per platform, without shared analysis or rewrite requests", async () => {
@@ -125,6 +140,10 @@ test("only the invalid platform gets one repair request", async () => {
     const platform = platforms.find((id) => prompt.startsWith(platformEditorialBriefs[id].prompt))!;
     const count = (counts.get(platform) ?? 0) + 1;
     counts.set(platform, count);
+    if (platform === "facebook" && count === 2) {
+      assert.match(prompt, /EVIDENCE REPAIR/);
+      assert.match(prompt, /COPY the supporting passage exactly/);
+    }
     const data = response(platform);
     if (platform === "facebook" && count === 1) data.sentences[1].evidence = ["This evidence does not exist in the source."];
     return { text: JSON.stringify(data), inputTokens: 10, outputTokens: 5 };
